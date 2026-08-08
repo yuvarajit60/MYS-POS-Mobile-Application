@@ -1,0 +1,194 @@
+/*
+  New objects for the AMSEL mobile sales-order app.
+  Additive only — does not alter any existing table/proc.
+  Safe to re-run (idempotent): drops and recreates each object.
+*/
+
+------------------------------------------------------------
+-- 1. Table type for order line items passed into the create proc
+--    (drop the proc first since it references the type)
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_SALESORDER', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER;
+GO
+
+IF TYPE_ID(N'dbo.TVP_MOBILE_SALESORDER_LINES') IS NOT NULL
+    DROP TYPE dbo.TVP_MOBILE_SALESORDER_LINES;
+GO
+
+CREATE TYPE dbo.TVP_MOBILE_SALESORDER_LINES AS TABLE
+(
+    PRODUCTID INT           NOT NULL,
+    QTY       NUMERIC(18,3) NOT NULL
+);
+GO
+
+------------------------------------------------------------
+-- 2. Refresh-token store (backs "skip login next time")
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.MOBILE_REFRESH_TOKENS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.MOBILE_REFRESH_TOKENS
+    (
+        TOKENID    INT IDENTITY(1,1) PRIMARY KEY,
+        USERID     INT          NOT NULL,   -- dbo.USERS has no PK/unique constraint, so no FK
+        DEVICEID   VARCHAR(100) NOT NULL,
+        TOKENHASH  VARCHAR(200) NOT NULL,
+        ISSUEDAT   DATETIME     NOT NULL DEFAULT GETDATE(),
+        EXPIRESAT  DATETIME     NOT NULL,
+        REVOKEDAT  DATETIME     NULL
+    );
+    CREATE INDEX IX_MOBILE_REFRESH_TOKENS_TOKENHASH ON dbo.MOBILE_REFRESH_TOKENS(TOKENHASH);
+END
+GO
+
+------------------------------------------------------------
+-- 3. OTP store (first-time mobile login verification)
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.MOBILE_OTP', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.MOBILE_OTP
+    (
+        OTPID     INT IDENTITY(1,1) PRIMARY KEY,
+        USERID    INT         NOT NULL,   -- dbo.USERS has no PK/unique constraint, so no FK
+        OTP       VARCHAR(10) NOT NULL,
+        MOBILENO  VARCHAR(20) NOT NULL,
+        EXPIRESAT DATETIME    NOT NULL,
+        CONSUMED  BIT         NOT NULL DEFAULT 0,
+        CREATEDAT DATETIME    NOT NULL DEFAULT GETDATE()
+    );
+    CREATE INDEX IX_MOBILE_OTP_USERID ON dbo.MOBILE_OTP(USERID);
+END
+GO
+
+------------------------------------------------------------
+-- 4. Sales-order creation proc
+--    Writes ONLY to dbo.SALESORDER / dbo.SALESORDER_DETAILS.
+--    Never touches dbo.STOCK_DETAILS or dbo.SALES / dbo.SALES_DETAILS.
+------------------------------------------------------------
+CREATE OR ALTER PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER
+(
+    @LOCATIONID        INT,
+    @CUSTOMERID        INT,
+    @CUSTOMERNAME      VARCHAR(100),
+    @MOBILENO          VARCHAR(50),
+    @SHIPPINGADDRESS   VARCHAR(500),
+    @CREATEDUSERID     INT,
+    @CREATEDEMPLOYEEID INT,
+    @LINES             dbo.TVP_MOBILE_SALESORDER_LINES READONLY,
+    @SALESORDERID      INT           OUTPUT,
+    @ENTRYNO           VARCHAR(MAX)  OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    -- Resolve authoritative price (PRODUCT_DETAILS, currently-valid row) and
+    -- stock/attributes (STOCK_DETAILS, one available batch per product+location).
+    -- Never trusts client-supplied rate/tax.
+    IF OBJECT_ID('tempdb..#LinePricing') IS NOT NULL DROP TABLE #LinePricing;
+
+    ;WITH RankedStock AS (
+        SELECT
+            SD.STOCKID, SD.PRODUCTID, SD.LOCATIONID, SD.HSNCODE, SD.BRANDID, SD.TYPEID,
+            SD.UOMID, SD.MRP, SD.PRATE, SD.PTAX, SD.MFGDATE, SD.EXPDATE, SD.STOCKQTY,
+            ROW_NUMBER() OVER (PARTITION BY SD.PRODUCTID, SD.LOCATIONID
+                                ORDER BY SD.MFGDATE ASC, SD.STOCKID ASC) AS rn
+        FROM dbo.STOCK_DETAILS SD
+        WHERE SD.LOCATIONID = @LOCATIONID AND SD.STOCKQTY > 0
+    )
+    SELECT
+        L.PRODUCTID,
+        L.QTY,
+        PD.SALE_RATE                    AS RATE,
+        RS.STOCKID, RS.HSNCODE, RS.BRANDID, RS.TYPEID, RS.UOMID, RS.MRP, RS.PRATE, RS.PTAX,
+        RS.MFGDATE, RS.EXPDATE, RS.STOCKQTY,
+        ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
+        ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
+        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE
+    INTO #LinePricing
+    FROM @LINES L
+    INNER JOIN dbo.PRODUCT_DETAILS PD
+        ON PD.PRODUCTID = L.PRODUCTID
+       AND PD.VALID = 1
+       AND GETDATE() >= PD.VALID_START_DATE
+       AND (PD.VALID_END_DATE IS NULL OR GETDATE() <= PD.VALID_END_DATE)
+    INNER JOIN RankedStock RS
+        ON RS.PRODUCTID = L.PRODUCTID AND RS.rn = 1
+    LEFT JOIN dbo.PRODUCT PR
+        ON PR.PRODUCTID = L.PRODUCTID;
+
+    IF (SELECT COUNT(*) FROM #LinePricing) <> (SELECT COUNT(*) FROM @LINES)
+    BEGIN
+        RAISERROR('One or more products have no current price (PRODUCT_DETAILS) or no available stock (STOCK_DETAILS) at this location.', 16, 1);
+        DROP TABLE #LinePricing;
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'SALESORDER',
+             @TRANNO = @ENTRYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
+        INSERT INTO dbo.SALESORDER
+            (ENTRYNO, ENTRYDATE, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID, PAYMENTMODE,
+             TAXABLEVALUE, TOTALTAX, ITEMVALUE, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, ROUNDOFF, NETAMOUNT,
+             SELECTRATE, CASHAMOUNT, CARDAMOUNT, RECEIVEDAMOUNT, REFUNDAMOUNT, SETTLEMENT, SETTLEMENTID, PAYMENT,
+             CANCELUSERID, CANCELID, CANCEL, CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
+             USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
+             SHIPPINGADDRESS, CUSTOMERNAME, OrderDate)
+        SELECT
+            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
+            SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            SUM(RATE * QTY), 0, 0, 0,
+            SUM(RATE * QTY) + SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
+            GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
+            @SHIPPINGADDRESS, @CUSTOMERNAME, CAST(GETDATE() AS DATE)
+        FROM #LinePricing;
+
+        SET @SALESORDERID = SCOPE_IDENTITY();
+
+        INSERT INTO dbo.SALESORDER_DETAILS
+            (SALESORDERID, COMPANYID, COUNTERID, BARCODE, PRODUCTID, PRODUCTCODE, HSNCODE, BRANDID, TYPEID, UOMID,
+             WEIGHT, QTY, MRP, RATE, GROSSAMOUNT, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, OTHERDISCOUNTAMOUNT,
+             TAXABLEVALUE, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT,
+             TOTALTAX, PERRATE, PRATE, PTAX, TOTALAMOUNT, STOCKQTY, MFGDATE, EXPDATE, ENTRYID,
+             PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY)
+        SELECT
+            @SALESORDERID, 1, 0, '', PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
+            0, QTY, MRP, RATE, RATE * QTY, 0, 0, 0,
+            RATE * QTY,
+            SALESCGSTPERCENTAGE, ROUND(RATE * QTY * SALESCGSTPERCENTAGE / 100.0, 2),
+            SALESSGSTPERCENTAGE, ROUND(RATE * QTY * SALESSGSTPERCENTAGE / 100.0, 2),
+            SALESIGSTPERCENTAGE, ROUND(RATE * QTY * SALESIGSTPERCENTAGE / 100.0, 2),
+            ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            RATE, PRATE, PTAX,
+            RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            STOCKQTY, MFGDATE, EXPDATE, STOCKID,
+            0, 0, 0, QTY
+        FROM #LinePricing;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #LinePricing;
+        THROW;
+    END CATCH
+
+    DROP TABLE #LinePricing;
+END
+GO

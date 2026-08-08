@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Scopes plaintext HTTP to the dev machine's LAN IP only (matches
+  ApiClient.baseUrl for Android in lib/core/api_client.dart). Android 9+
+  blocks cleartext traffic by default; this is the minimal exception needed
+  for local testing against the API run via `dotnet run` on the same Wi-Fi.
+  Remove this once the API is hosted behind real HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.0.101</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

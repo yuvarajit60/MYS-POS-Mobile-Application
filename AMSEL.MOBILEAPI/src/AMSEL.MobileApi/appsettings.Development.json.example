@@ -1,0 +1,18 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "MobileApiDb": "Server=.\\SQLEXPRESS;Database=db_ams_erp;User Id=<user>;Password=<password>;TrustServerCertificate=True;"
+  },
+  "Jwt": {
+    "SigningKey": "DEV-ONLY-SIGNING-KEY-REPLACE-IN-PRODUCTION-32BYTESMIN"
+  },
+  "Sms": {
+    "Username": "<sms-gateway-username>",
+    "Password": "<sms-gateway-password>"
+  }
+}

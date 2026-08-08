@@ -1,0 +1,31 @@
+# --- Secrets (real values, never commit) ---
+appsettings.Development.json
+.env
+
+# --- .NET (AMSEL.MOBILEAPI) ---
+bin/
+obj/
+*.user
+.vs/
+
+# --- Flutter (amsel_mobile) ---
+**/build/
+.dart_tool/
+.flutter-plugin-dependencies
+.packages
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/key.properties
+android/app/*.jks
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+*.iml
+.idea/
+
+# --- Misc ---
+Testing Image/
+.DS_Store
+Thumbs.db

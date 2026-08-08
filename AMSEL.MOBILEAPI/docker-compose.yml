@@ -1,0 +1,14 @@
+# Local sanity-check for the container before handing it to a cloud host:
+#   docker compose up --build
+# Fill in the real values in a sibling ".env" file (see .env.example) —
+# never commit real secrets into this file or into source control.
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__MobileApiDb: ${CONNECTION_STRING}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Sms__Username: ${SMS_USERNAME}
+      Sms__Password: ${SMS_PASSWORD}
