@@ -7,6 +7,18 @@ public record ProductDto(
     decimal SalesCgstPercentage,
     decimal SalesSgstPercentage);
 
+public record ProductDetailDto(
+    int ProductId,
+    string ProductName,
+    decimal Mrp,
+    int ProductGroupId,
+    string ProductGroupName,
+    int BrandId,
+    string BrandName,
+    int TypeId,
+    string TypeName,
+    decimal SalesGstPercentage);
+
 public record ProductGroupDto(int ProductGroupId, string ProductGroupName);
 
 public record BrandDto(int BrandId, string BrandName);
@@ -14,6 +26,14 @@ public record BrandDto(int BrandId, string BrandName);
 public record TypeDto(int TypeId, string TypeName);
 
 public record CreateProductRequest(
+    string ProductName,
+    decimal Mrp,
+    int ProductGroupId,
+    int BrandId,
+    int TypeId,
+    decimal SalesGstPercentage);
+
+public record UpdateProductRequest(
     string ProductName,
     decimal Mrp,
     int ProductGroupId,

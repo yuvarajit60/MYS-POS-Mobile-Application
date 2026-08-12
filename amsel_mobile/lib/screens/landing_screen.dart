@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/session.dart';
-import 'create_customer_screen.dart';
-import 'create_product_screen.dart';
 import 'create_sales_order_screen.dart';
 import 'login_screen.dart';
+import 'manage_customers_screen.dart';
+import 'manage_products_screen.dart';
 import 'reports_screen.dart';
 import 'widgets/amsel_app_bar_title.dart';
 
@@ -65,17 +65,17 @@ class LandingScreen extends StatelessWidget {
                   ),
                 ),
                 _ActionCard(
-                  icon: Icons.person_add_alt,
-                  label: 'Add New Customer',
+                  icon: Icons.people_alt_outlined,
+                  label: 'Customers',
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CreateCustomerScreen()),
+                    MaterialPageRoute(builder: (_) => const ManageCustomersScreen()),
                   ),
                 ),
                 _ActionCard(
-                  icon: Icons.add_box_outlined,
-                  label: 'Add New Product',
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Products',
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CreateProductScreen()),
+                    MaterialPageRoute(builder: (_) => const ManageProductsScreen()),
                   ),
                 ),
               ],

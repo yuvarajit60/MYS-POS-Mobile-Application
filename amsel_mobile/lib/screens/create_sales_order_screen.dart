@@ -5,8 +5,8 @@ import '../models/sales_order_line.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
 import '../services/sales_order_service.dart';
-import 'create_customer_screen.dart';
-import 'create_product_screen.dart';
+import 'customer_form_screen.dart';
+import 'product_form_screen.dart';
 import 'widgets/line_items_grid.dart';
 import 'widgets/search_picker_sheet.dart';
 
@@ -42,7 +42,7 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
       itemSubtitle: (c) => c.mobileNo,
       addNewLabel: 'Add New Customer',
       onAddNew: (context) => Navigator.of(context).push<Customer>(
-        MaterialPageRoute(builder: (_) => const CreateCustomerScreen()),
+        MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
       ),
     );
     if (customer != null) setState(() => _selectedCustomer = customer);
@@ -62,7 +62,7 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
       itemSubtitle: (p) => 'MRP: ${p.rate.toStringAsFixed(2)}',
       addNewLabel: 'Add New Product',
       onAddNew: (context) => Navigator.of(context).push<Product>(
-        MaterialPageRoute(builder: (_) => const CreateProductScreen()),
+        MaterialPageRoute(builder: (_) => const ProductFormScreen()),
       ),
     );
     if (product == null) return;

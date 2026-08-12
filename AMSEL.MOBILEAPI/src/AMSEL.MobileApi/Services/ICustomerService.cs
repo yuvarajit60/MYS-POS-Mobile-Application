@@ -7,7 +7,10 @@ namespace AMSEL.MobileApi.Services;
 public interface ICustomerService
 {
     Task<IReadOnlyList<CustomerDto>> SearchAsync(string? search);
+    Task<CustomerDetailDto?> GetByIdAsync(int customerId);
     Task<CustomerDto> CreateAsync(CreateCustomerRequest request, int locationId, int userId, int employeeId);
+    Task<CustomerDto> UpdateAsync(int customerId, UpdateCustomerRequest request, int locationId, int userId, int employeeId);
+    Task<bool> DeleteAsync(int customerId, int locationId, int userId, int employeeId);
 }
 
 public class CustomerService : ICustomerService
@@ -34,6 +37,20 @@ public class CustomerService : ICustomerService
             new { Search = search, Like = like });
 
         return rows.ToList();
+    }
+
+    public async Task<CustomerDetailDto?> GetByIdAsync(int customerId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QueryFirstOrDefaultAsync<CustomerDetailDto>(
+            """
+            SELECT C.CUSTOMERID AS CustomerId, C.CUSTOMERNAME AS CustomerName, ISNULL(C.MOBILENO, '') AS MobileNo,
+                   C.CITYID AS CityId, ISNULL(CI.CITYNAME, '') AS CityName, ISNULL(C.ADDRESS, '') AS Address
+            FROM CUSTOMER C
+            LEFT JOIN CITY CI ON CI.CITYID = C.CITYID
+            WHERE C.CUSTOMERID = @CustomerId AND C.STATUS = 1
+            """,
+            new { CustomerId = customerId });
     }
 
     /// <summary>
@@ -70,5 +87,50 @@ public class CustomerService : ICustomerService
             });
 
         return new CustomerDto(customerId, request.CustomerName, request.MobileNo);
+    }
+
+    public async Task<CustomerDto> UpdateAsync(int customerId, UpdateCustomerRequest request, int locationId, int userId, int employeeId)
+    {
+        var address = request.Address ?? "";
+
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            """
+            UPDATE CUSTOMER
+            SET CUSTOMERNAME = @CustomerName, PRINTNAME = @CustomerName, MOBILENO = @MobileNo,
+                ADDRESS = @Address, PRINTADDRESS = @Address, CITYID = @CityId,
+                MODIFYEDLOCATIONID = @LocationId, LASTMODIFYEDUSERID = @UserId,
+                LASTMODIFYEDDATE = GETDATE(), MODIFYEDEMPLOYEEID = @EmployeeId
+            WHERE CUSTOMERID = @CustomerId AND STATUS = 1
+            """,
+            new
+            {
+                CustomerId = customerId,
+                request.CustomerName,
+                request.MobileNo,
+                Address = address,
+                request.CityId,
+                LocationId = locationId,
+                UserId = userId,
+                EmployeeId = employeeId,
+            });
+
+        return new CustomerDto(customerId, request.CustomerName, request.MobileNo);
+    }
+
+    /// <summary>Soft delete (STATUS=0) — preserves the customer name/mobile on any existing SALESORDER rows, which store their own snapshot rather than joining live.</summary>
+    public async Task<bool> DeleteAsync(int customerId, int locationId, int userId, int employeeId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rowsAffected = await connection.ExecuteAsync(
+            """
+            UPDATE CUSTOMER
+            SET STATUS = 0, MODIFYEDLOCATIONID = @LocationId, LASTMODIFYEDUSERID = @UserId,
+                LASTMODIFYEDDATE = GETDATE(), MODIFYEDEMPLOYEEID = @EmployeeId
+            WHERE CUSTOMERID = @CustomerId AND STATUS = 1
+            """,
+            new { CustomerId = customerId, LocationId = locationId, UserId = userId, EmployeeId = employeeId });
+
+        return rowsAffected > 0;
     }
 }

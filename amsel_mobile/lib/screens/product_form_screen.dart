@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/brand.dart';
 import '../models/product.dart';
+import '../models/product_detail.dart';
 import '../models/product_group.dart';
 import '../models/product_type.dart';
 import '../services/brand_service.dart';
@@ -9,22 +10,25 @@ import '../services/product_service.dart';
 import '../services/product_type_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
-/// Quick "add a product on the spot" form for field sales reps. Creates the
-/// product in both dbo.PRODUCT and dbo.PRODUCT_DETAILS (kept in sync).
-/// Returns the newly created Product via Navigator.pop so callers (landing
-/// page or the product search picker) can use it immediately.
-class CreateProductScreen extends StatefulWidget {
-  const CreateProductScreen({super.key});
+/// Add-or-edit form for a product. In create mode (no [editing] passed) this
+/// is the quick "add a product on the spot" flow used by field reps mid-order
+/// and from the landing page. In edit mode (an existing [ProductDetail]
+/// passed in) it also offers Delete. Pops with the saved Product on save, or
+/// `true` on delete — callers that only care "did something change" (the
+/// manage-products list) can treat either as "refresh".
+class ProductFormScreen extends StatefulWidget {
+  final ProductDetail? editing;
+  const ProductFormScreen({super.key, this.editing});
 
   @override
-  State<CreateProductScreen> createState() => _CreateProductScreenState();
+  State<ProductFormScreen> createState() => _ProductFormScreenState();
 }
 
-class _CreateProductScreenState extends State<CreateProductScreen> {
+class _ProductFormScreenState extends State<ProductFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _mrpController = TextEditingController();
-  final _gstController = TextEditingController();
+  late final _nameController = TextEditingController(text: widget.editing?.productName);
+  late final _mrpController = TextEditingController(text: widget.editing?.mrp.toString());
+  late final _gstController = TextEditingController(text: widget.editing?.salesGstPercentage.toString());
   final _productService = ProductService();
   final _productGroupService = ProductGroupService();
   final _brandService = BrandService();
@@ -34,6 +38,20 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   Brand? _selectedBrand;
   ProductType? _selectedType;
   bool _saving = false;
+  bool _deleting = false;
+
+  bool get _isEditing => widget.editing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final editing = widget.editing;
+    if (editing != null) {
+      _selectedGroup = ProductGroup(productGroupId: editing.productGroupId, productGroupName: editing.productGroupName);
+      _selectedBrand = Brand(brandId: editing.brandId, brandName: editing.brandName);
+      _selectedType = ProductType(typeId: editing.typeId, typeName: editing.typeName);
+    }
+  }
 
   Future<void> _pickGroup() async {
     final group = await showSearchPicker<ProductGroup>(
@@ -76,20 +94,65 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
 
     setState(() => _saving = true);
     try {
-      final product = await _productService.create(
-        productName: _nameController.text.trim(),
-        mrp: double.parse(_mrpController.text.trim()),
-        productGroup: _selectedGroup!,
-        brand: _selectedBrand!,
-        type: _selectedType!,
-        salesGstPercentage: double.parse(_gstController.text.trim()),
-      );
+      final productName = _nameController.text.trim();
+      final mrp = double.parse(_mrpController.text.trim());
+      final gst = double.parse(_gstController.text.trim());
+
+      final product = _isEditing
+          ? await _productService.update(
+              productId: widget.editing!.productId,
+              productName: productName,
+              mrp: mrp,
+              productGroup: _selectedGroup!,
+              brand: _selectedBrand!,
+              type: _selectedType!,
+              salesGstPercentage: gst,
+            )
+          : await _productService.create(
+              productName: productName,
+              mrp: mrp,
+              productGroup: _selectedGroup!,
+              brand: _selectedBrand!,
+              type: _selectedType!,
+              salesGstPercentage: gst,
+            );
       if (!mounted) return;
       Navigator.of(context).pop<Product>(product);
     } on ProductServiceException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete product?'),
+        content: Text('Delete "${widget.editing!.productName}"? This cannot be undone from the app.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _productService.delete(widget.editing!.productId);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on ProductServiceException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -103,8 +166,19 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _saving || _deleting;
     return Scaffold(
-      appBar: AppBar(title: const Text('Add New Product')),
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Edit Product' : 'Add New Product'),
+        actions: [
+          if (_isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: 'Delete',
+              onPressed: busy ? null : _confirmDelete,
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -167,7 +241,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
               ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: _saving ? null : _save,
+                onPressed: busy ? null : _save,
                 style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                 child: _saving ? const CircularProgressIndicator() : const Text('Save'),
               ),
