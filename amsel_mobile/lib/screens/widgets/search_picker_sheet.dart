@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 /// Generic bottom-sheet search picker, shared by the customer and product
 /// pickers on the Create Sales Order screen. Debounces input and re-queries
 /// [search] as the user types. If [addNewLabel]/[onAddNew] are supplied, an
-/// "add new" row is always shown at the top of the results — tapping it runs
-/// [onAddNew] (typically pushing a create-record screen); if that returns a
-/// non-null item, the sheet closes with that item as the picked result.
+/// "add new" action is offered only when the current search has no matches
+/// — tapping it runs [onAddNew] (typically pushing a create-record screen);
+/// if that returns a non-null item, the sheet closes with that item as the
+/// picked result.
 Future<T?> showSearchPicker<T>({
   required BuildContext context,
   required String title,
@@ -126,16 +127,24 @@ class _SearchPickerSheetState<T> extends State<_SearchPickerSheet<T>> {
               ),
             ),
             if (_loading) const LinearProgressIndicator(),
-            if (canAddNew)
-              ListTile(
-                leading: const Icon(Icons.add_circle_outline, color: Colors.indigo),
-                title: Text(widget.addNewLabel!, style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.w600)),
-                onTap: _handleAddNew,
-              ),
-            if (canAddNew) const Divider(height: 1),
             Expanded(
               child: _results.isEmpty && !_loading
-                  ? const Center(child: Text('No results'))
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('No results'),
+                          if (canAddNew) ...[
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: _handleAddNew,
+                              icon: const Icon(Icons.add_circle_outline),
+                              label: Text(widget.addNewLabel!),
+                            ),
+                          ],
+                        ],
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: _results.length,
                       itemBuilder: (context, index) {
