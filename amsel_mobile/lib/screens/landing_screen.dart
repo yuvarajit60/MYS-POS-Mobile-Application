@@ -51,8 +51,7 @@ class LandingScreen extends StatelessWidget {
               children: [
                 _ActionCard(
                   icon: Icons.add_shopping_cart,
-                  label: 'Create Sales Order',
-                  highlighted: true,
+                  label: 'Sales Order',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const CreateSalesOrderScreen()),
                   ),
@@ -137,19 +136,17 @@ class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool highlighted;
 
   const _ActionCard({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.highlighted = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: highlighted ? AmselColors.gold : Colors.white,
+      color: AmselColors.gold,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
