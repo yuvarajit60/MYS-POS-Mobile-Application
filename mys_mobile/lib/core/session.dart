@@ -12,6 +12,7 @@ class Session extends ChangeNotifier {
 
   String? accessToken;
   DateTime? accessTokenExpiresAt;
+  bool isDriver = false;
 
   bool get isAuthenticated => accessToken != null;
 
@@ -50,6 +51,7 @@ class Session extends ChangeNotifier {
   Future<void> _applyAuthResponse(Map<String, dynamic> json) async {
     accessToken = json['accessToken'] as String;
     accessTokenExpiresAt = DateTime.parse(json['accessTokenExpiresAt'] as String);
+    isDriver = json['isDriver'] as bool? ?? false;
     await SecureStorage.instance.setRefreshToken(json['refreshToken'] as String);
     notifyListeners();
   }
@@ -57,6 +59,7 @@ class Session extends ChangeNotifier {
   Future<void> logout() async {
     accessToken = null;
     accessTokenExpiresAt = null;
+    isDriver = false;
     await SecureStorage.instance.clear();
     notifyListeners();
   }

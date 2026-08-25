@@ -5,18 +5,18 @@ import 'screens/landing_screen.dart';
 import 'screens/login_screen.dart';
 
 void main() {
-  runApp(const AmselMobileApp());
+  runApp(const MysMobileApp());
 }
 
-class AmselMobileApp extends StatelessWidget {
-  const AmselMobileApp({super.key});
+class MysMobileApp extends StatelessWidget {
+  const MysMobileApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AMSEL Sales',
+      title: 'MYS Sales',
       debugShowCheckedModeBanner: false,
-      theme: buildAmselTheme(),
+      theme: buildMysTheme(),
       home: const _BootGate(),
     );
   }

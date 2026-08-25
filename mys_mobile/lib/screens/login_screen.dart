@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'landing_screen.dart';
 import 'request_otp_screen.dart';
-import 'widgets/amsel_app_bar_title.dart';
+import 'widgets/mys_app_bar_title.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const AmselAppBarTitle(), toolbarHeight: 68),
+      appBar: AppBar(title: const MysAppBarTitle(), toolbarHeight: 68),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Image.asset('assets/icon/amsel_icon.png', height: 96),
+                Image.asset('assets/icon/mys_logo.png', height: 96),
                 const SizedBox(height: 16),
                 Text('Sign in', style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
                 const SizedBox(height: 24),

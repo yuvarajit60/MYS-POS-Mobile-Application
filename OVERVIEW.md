@@ -7,10 +7,10 @@ so office staff see the same data with no re-entry.
 
 It is two projects under this folder:
 
-- **`amsel_mobile/`** — the Flutter app (Android/iOS), displayed on-device as **Amsel**.
-- **`AMSEL.MOBILEAPI/`** — an ASP.NET Core Web API that sits between the phone and the
+- **`mys_mobile/`** — the Flutter app (Android/iOS), displayed on-device as **Amsel**.
+- **`MYS.MOBILEAPI/`** — an ASP.NET Core Web API that sits between the phone and the
   database (phones can't connect to SQL Server directly), documented for deployment in
-  [`AMSEL.MOBILEAPI/DEPLOYMENT.md`](AMSEL.MOBILEAPI/DEPLOYMENT.md).
+  [`MYS.MOBILEAPI/DEPLOYMENT.md`](MYS.MOBILEAPI/DEPLOYMENT.md).
 
 ## Sign in
 
@@ -77,7 +77,7 @@ Search-and-list screens reachable from the landing page:
   device's native print system.
 - **Graph**: bar chart of sales, grouped Monthly or Yearly.
 
-## Backend API surface (`AMSEL.MOBILEAPI`)
+## Backend API surface (`MYS.MOBILEAPI`)
 
 | Area | Endpoints |
 |---|---|

@@ -44,6 +44,6 @@ public class OtpController : ControllerBase
         var (token, expiresAt) = _jwtTokenService.GenerateAccessToken(user);
         var refreshToken = await _refreshTokenStore.IssueAsync(user.UserId, request.DeviceId);
 
-        return Ok(new AuthResponse(token, expiresAt, refreshToken));
+        return Ok(new AuthResponse(token, expiresAt, refreshToken, user.IsDriver));
     }
 }

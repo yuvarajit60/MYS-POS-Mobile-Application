@@ -103,7 +103,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: ListTile(
                 title: Text(line.productName),
                 subtitle: Text('Qty: ${line.qty.toStringAsFixed(0)} x ${line.rate.toStringAsFixed(2)}'),
-                trailing: Text(line.totalAmount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: Text(line.taxableValue.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
           const Divider(),

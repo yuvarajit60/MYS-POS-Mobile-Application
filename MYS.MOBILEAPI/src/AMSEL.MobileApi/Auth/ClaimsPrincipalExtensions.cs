@@ -15,4 +15,7 @@ public static class ClaimsPrincipalExtensions
 
     public static string GetUsername(this ClaimsPrincipal user) =>
         user.FindFirstValue("username")!;
+
+    public static bool GetIsDriver(this ClaimsPrincipal user) =>
+        user.FindFirstValue("isDriver") == "1";
 }

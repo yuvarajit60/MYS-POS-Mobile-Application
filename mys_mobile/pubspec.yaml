@@ -54,15 +54,19 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
-# flutter_launcher_icons config: uses the same icon as AMSEL.WINAPP (extracted
-# from the desktop app's LOGO.ico) as the mobile app's launcher icon.
+# flutter_launcher_icons config: uses the MYS logo as the mobile app's launcher icon.
 # Run: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/amsel_icon.png"
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#ffffff"
+    theme_color: "#0F1E33"
+  image_path: "assets/icon/mys_logo.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icon/amsel_icon.png"
+  adaptive_icon_foreground: "assets/icon/mys_logo.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -76,7 +80,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon/amsel_icon.png
+    - assets/icon/mys_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

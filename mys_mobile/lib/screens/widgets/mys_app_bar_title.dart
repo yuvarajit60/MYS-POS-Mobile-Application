@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../core/company_provider.dart';
 
-/// Shared branded app bar title: AMSEL logo + the configured company name
-/// (fetched from dbo.COMPANY — falls back to "AMSEL Sales" while loading or
+/// Shared branded app bar title: MYS logo + the configured company name
+/// (fetched from dbo.COMPANY — falls back to "MYS Sales" while loading or
 /// if the fetch fails, since it works pre-login too).
-class AmselAppBarTitle extends StatefulWidget {
-  const AmselAppBarTitle({super.key});
+class MysAppBarTitle extends StatefulWidget {
+  const MysAppBarTitle({super.key});
 
   @override
-  State<AmselAppBarTitle> createState() => _AmselAppBarTitleState();
+  State<MysAppBarTitle> createState() => _MysAppBarTitleState();
 }
 
-class _AmselAppBarTitleState extends State<AmselAppBarTitle> {
+class _MysAppBarTitleState extends State<MysAppBarTitle> {
   @override
   void initState() {
     super.initState();
@@ -31,12 +31,12 @@ class _AmselAppBarTitleState extends State<AmselAppBarTitle> {
 
   @override
   Widget build(BuildContext context) {
-    final name = CompanyProvider.instance.company?.companyName ?? 'AMSEL Sales';
+    final name = CompanyProvider.instance.company?.companyName ?? 'MYS Sales';
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image.asset('assets/icon/amsel_icon.png', height: 32),
+        Image.asset('assets/icon/mys_logo.png', height: 32),
         const SizedBox(width: 10),
         Flexible(
           child: Text(

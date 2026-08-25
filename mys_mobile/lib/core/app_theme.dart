@@ -1,48 +1,52 @@
 import 'package:flutter/material.dart';
 
-/// Brand colors sampled directly from the AMSEL logo (assets/icon/amsel_icon.png)
-/// so the app's palette matches the desktop app's own branding exactly.
-class AmselColors {
-  static const gold = Color(0xFFFDC92A);
-  static const charcoal = Color(0xFF282829);
+/// Brand colors from mysglobaltechnologies.com's own stylesheet
+/// (--navy-900 / --green-500 / --green-600 custom properties).
+class MysColors {
+  static const navy900 = Color(0xFF0F1E33);
+  static const navy800 = Color(0xFF16283F);
+  static const green500 = Color(0xFF10B981);
+  static const green600 = Color(0xFF059669);
+  static const green400 = Color(0xFF22C55E);
+  static const bgLight = Color(0xFFEEF1F6);
 }
 
-ThemeData buildAmselTheme() {
+ThemeData buildMysTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AmselColors.gold,
+    seedColor: MysColors.green500,
     brightness: Brightness.light,
   ).copyWith(
-    primary: AmselColors.gold,
-    onPrimary: AmselColors.charcoal,
-    secondary: AmselColors.charcoal,
+    primary: MysColors.green500,
+    onPrimary: Colors.white,
+    secondary: MysColors.navy900,
     onSecondary: Colors.white,
     surface: Colors.white,
-    onSurface: AmselColors.charcoal,
+    onSurface: MysColors.navy900,
   );
 
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+    scaffoldBackgroundColor: MysColors.bgLight,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,
-      foregroundColor: AmselColors.charcoal,
+      foregroundColor: MysColors.navy900,
       elevation: 0,
       scrolledUnderElevation: 2,
       centerTitle: false,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: AmselColors.gold,
-        foregroundColor: AmselColors.charcoal,
+        backgroundColor: MysColors.green500,
+        foregroundColor: Colors.white,
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: AmselColors.charcoal,
-        side: const BorderSide(color: AmselColors.charcoal, width: 1.4),
+        foregroundColor: MysColors.navy900,
+        side: const BorderSide(color: MysColors.navy900, width: 1.4),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -51,7 +55,7 @@ ThemeData buildAmselTheme() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AmselColors.gold, width: 2),
+        borderSide: const BorderSide(color: MysColors.green500, width: 2),
       ),
     ),
     cardTheme: CardThemeData(

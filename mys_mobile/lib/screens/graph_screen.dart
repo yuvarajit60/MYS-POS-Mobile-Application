@@ -154,7 +154,7 @@ class _GraphScreenState extends State<GraphScreen> {
               barRods: [
                 BarChartRodData(
                   toY: _points[i].totalAmount,
-                  color: AmselColors.gold,
+                  color: MysColors.green500,
                   width: 18,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                 ),

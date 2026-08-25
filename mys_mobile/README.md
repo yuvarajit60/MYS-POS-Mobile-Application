@@ -1,4 +1,4 @@
-# amsel_mobile
+# MYS Mobile
 
 A new Flutter project.
 

@@ -37,6 +37,7 @@ public class JwtTokenService : IJwtTokenService
             new("locationId", user.LocationId.ToString()),
             new("employeeId", user.EmployeeId.ToString()),
             new("branchId", user.BranchId.ToString()),
+            new("isDriver", user.IsDriver ? "1" : "0"),
         };
 
         var credentials = new SigningCredentials(

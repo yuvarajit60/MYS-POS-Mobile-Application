@@ -23,7 +23,7 @@ public class AuthService : IAuthService
         """
         SELECT USR.USERID, USR.USERNAME, USR.LOCATIONID, USR.EMPLOYEEID,
                ISNULL(EMP.EMPLOYEENAME, '') AS EmployeeName, ISNULL(EMP.MOBILENO, '') AS MobileNo,
-               BR.BRANCHID
+               BR.BRANCHID, CAST(ISNULL(EMP.ISDRIVER, 0) AS BIT) AS IsDriver
         FROM USERS USR
         INNER JOIN LOCATION LOC ON LOC.LOCATIONID = USR.LOCATIONID
         LEFT OUTER JOIN EMPLOYEE EMP ON EMP.EMPLOYEEID = USR.EMPLOYEEID
@@ -35,7 +35,7 @@ public class AuthService : IAuthService
         """
         SELECT USR.USERID, USR.USERNAME, USR.LOCATIONID, USR.EMPLOYEEID,
                ISNULL(EMP.EMPLOYEENAME, '') AS EmployeeName, ISNULL(EMP.MOBILENO, '') AS MobileNo,
-               BR.BRANCHID
+               BR.BRANCHID, CAST(ISNULL(EMP.ISDRIVER, 0) AS BIT) AS IsDriver
         FROM USERS USR
         INNER JOIN LOCATION LOC ON LOC.LOCATIONID = USR.LOCATIONID
         LEFT OUTER JOIN EMPLOYEE EMP ON EMP.EMPLOYEEID = USR.EMPLOYEEID
@@ -47,7 +47,7 @@ public class AuthService : IAuthService
         """
         SELECT TOP 1 USR.USERID, USR.USERNAME, USR.LOCATIONID, USR.EMPLOYEEID,
                EMP.EMPLOYEENAME AS EmployeeName, EMP.MOBILENO AS MobileNo,
-               BR.BRANCHID
+               BR.BRANCHID, CAST(ISNULL(EMP.ISDRIVER, 0) AS BIT) AS IsDriver
         FROM USERS USR
         INNER JOIN LOCATION LOC ON LOC.LOCATIONID = USR.LOCATIONID
         INNER JOIN EMPLOYEE EMP ON EMP.EMPLOYEEID = USR.EMPLOYEEID
@@ -95,7 +95,7 @@ public class AuthService : IAuthService
     }
 
     private static AuthenticatedUser ToAuthenticatedUser(UserRow row) => new(
-        row.USERID, row.USERNAME, row.LOCATIONID, row.EMPLOYEEID, row.EmployeeName, row.BRANCHID, row.MobileNo);
+        row.USERID, row.USERNAME, row.LOCATIONID, row.EMPLOYEEID, row.EmployeeName, row.BRANCHID, row.MobileNo, row.IsDriver);
 
-    private record UserRow(int USERID, string USERNAME, int LOCATIONID, int EMPLOYEEID, string EmployeeName, string MobileNo, int BRANCHID);
+    private record UserRow(int USERID, string USERNAME, int LOCATIONID, int EMPLOYEEID, string EmployeeName, string MobileNo, int BRANCHID, bool IsDriver);
 }

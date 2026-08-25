@@ -8,7 +8,7 @@ public record OtpVerifyRequest(string MobileNo, string Otp, string DeviceId);
 
 public record RefreshRequest(string RefreshToken, string DeviceId);
 
-public record AuthResponse(string AccessToken, DateTime AccessTokenExpiresAt, string RefreshToken);
+public record AuthResponse(string AccessToken, DateTime AccessTokenExpiresAt, string RefreshToken, bool IsDriver);
 
 public record AuthenticatedUser(
     int UserId,
@@ -17,4 +17,5 @@ public record AuthenticatedUser(
     int EmployeeId,
     string EmployeeName,
     int BranchId,
-    string? MobileNo);
+    string? MobileNo,
+    bool IsDriver);

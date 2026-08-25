@@ -51,7 +51,7 @@ public class OtpService : IOtpService
 
         try
         {
-            await _smsGateway.SendAsync(mobileNo, $"Your AMSEL mobile app verification code is {otp}. Valid for 5 minutes.");
+            await _smsGateway.SendAsync(mobileNo, $"Your MYS mobile app verification code is {otp}. Valid for 5 minutes.");
         }
         catch (Exception ex)
         {

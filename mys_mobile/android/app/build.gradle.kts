@@ -39,7 +39,7 @@ android {
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
                 val suffix = if (variant.buildType.name == "debug") "-debug" else ""
-                output.outputFileName = "Amsel_Mobile_App$suffix.apk"
+                output.outputFileName = "MYS_Mobile_App$suffix.apk"
             }
     }
 }
