@@ -19,9 +19,9 @@ REGISTRY_NAME="amselmobileacr"
 WEBAPP_NAME="amsel-mobile-api"
 IMAGE_NAME="amsel-mobile-api"
 IMAGE_TAG="latest"
-GITHUB_REPO="github.com/yuvarajit60/Amsel-Mobile-Application.git"
+GITHUB_REPO="github.com/yuvarajit60/MYS-POS-Mobile-Application.git"
 GITHUB_BRANCH="main"
-DOCKER_CONTEXT="AMSEL.MOBILE/AMSEL.MOBILEAPI"
+DOCKER_CONTEXT="MYS.MOBILE/MYS.MOBILEAPI"
 # -------------------------------------------------------------
 
 if [ -z "${GITHUB_PAT:-}" ]; then
