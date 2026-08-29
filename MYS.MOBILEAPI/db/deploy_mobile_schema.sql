@@ -11,15 +11,20 @@
   002 immediately replaces them anyway. Idempotent — safe to re-run.
 
   Also includes 003_trip_entry.sql's objects (Trip Entry, added later —
-  see that file's header for the METERORHOURSID convention it introduces).
+  see that file's header for the METERORHOURSID convention it introduces)
+  AND 004_prod_prerequisites.sql's objects (EMPLOYEE.ISDRIVER, PRODUCT_DETAILS,
+  EMPLOYEE_VEHICLE_MAPPING — these turned out to exist in the dev/test
+  database but not in real production when compared directly on 2026-08-27;
+  see that file's header for the risk note on the EMPLOYEE.ISDRIVER column add).
 
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
-            PRODUCT_DETAILS, PRODUCTGROUP, BRAND, TYPE, SALESORDER,
-            SALESORDER_DETAILS, COMPANY, TRANSACTIONS, SITE, VEHICLE,
-            EMPLOYEE_VEHICLE_MAPPING, TRIPENTRY, TRIPENTRY_DETAILS
+            PRODUCTGROUP, BRAND, TYPE, SALESORDER, SALESORDER_DETAILS,
+            COMPANY, TRANSACTIONS, SITE, VEHICLE, TRIPENTRY, TRIPENTRY_DETAILS
     Stored procedure: dbo.SP_GENERATETRANNO
+    (PRODUCT_DETAILS and EMPLOYEE_VEHICLE_MAPPING moved out of this list —
+    this script now creates them itself if missing, per 004.)
 */
 
 ------------------------------------------------------------
@@ -343,5 +348,60 @@ BEGIN
     END CATCH
 
     DROP TABLE #LinePricing;
+END
+GO
+
+------------------------------------------------------------
+-- 6. Go-live prerequisites (see 004_prod_prerequisites.sql for the full
+--    risk note on the EMPLOYEE.ISDRIVER column add). These three objects
+--    exist in the dev/test database but were found missing from real
+--    production when compared directly on 2026-08-27.
+------------------------------------------------------------
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'EMPLOYEE' AND COLUMN_NAME = 'ISDRIVER'
+)
+BEGIN
+    ALTER TABLE dbo.EMPLOYEE
+        ADD ISDRIVER INT NOT NULL CONSTRAINT DF_EMPLOYEE_ISDRIVER DEFAULT 0;
+END
+GO
+
+IF OBJECT_ID(N'dbo.PRODUCT_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.PRODUCT_DETAILS
+    (
+        PRODUCTID        INT           NOT NULL,
+        PRODUCTNAME      VARCHAR(100)  NOT NULL,
+        SALE_RATE        NUMERIC(12,2) NOT NULL,
+        RETAIL_RATE      NUMERIC(18,0) NOT NULL,
+        PURCHASE_RATE    NUMERIC(12,2) NOT NULL,
+        VALID_START_DATE DATETIME      NOT NULL,
+        VALID_END_DATE   DATETIME      NULL,
+        CREATE_DATE      DATETIME      NOT NULL,
+        CREATE_USER      VARCHAR(50)   NOT NULL,
+        MODIFIED_DATE    DATETIME      NULL,
+        MODIFIED_USER    VARCHAR(50)   NULL,
+        VALID            INT           NOT NULL CONSTRAINT DF_PRODUCT_DETAILS_VALID DEFAULT 1
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.EMPLOYEE_VEHICLE_MAPPING', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.EMPLOYEE_VEHICLE_MAPPING
+    (
+        MAPPINGID          INT IDENTITY(1,1) NOT NULL,
+        EMPLOYEEID         VARCHAR(50)  NULL,
+        VEHICLEID          VARCHAR(50)  NULL,
+        VALIDSTARTDATE     DATETIME     NULL,
+        VALIDENDDATE       DATETIME     NULL,
+        CREATEDUSERID      INT          NOT NULL,
+        LASTMODIFYEDUSERID INT          NOT NULL,
+        USERCREATEDDATE    DATETIME     NULL,
+        LASTMODIFYEDDATE   DATETIME     NULL,
+        CREATEDEMPLOYEEID  INT          NOT NULL,
+        MODIFYEDEMPLOYEEID INT          NOT NULL
+    );
 END
 GO

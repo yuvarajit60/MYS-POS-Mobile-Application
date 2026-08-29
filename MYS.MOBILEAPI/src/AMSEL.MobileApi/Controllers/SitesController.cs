@@ -1,3 +1,4 @@
+using AMSEL.MobileApi.Auth;
 using AMSEL.MobileApi.Data.Dto;
 using AMSEL.MobileApi.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -20,4 +21,35 @@ public class SitesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SiteDto>>> Search([FromQuery] string? search)
         => Ok(await _siteService.SearchAsync(search));
+
+    [HttpGet("{siteId:int}")]
+    public async Task<ActionResult<SiteDetailDto>> GetById(int siteId)
+    {
+        var site = await _siteService.GetByIdAsync(siteId);
+        return site is null ? NotFound() : Ok(site);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<SiteDetailDto>> Create(CreateSiteRequest request)
+    {
+        var result = await _siteService.CreateAsync(
+            request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+        return Ok(result);
+    }
+
+    [HttpPut("{siteId:int}")]
+    public async Task<ActionResult<SiteDetailDto>> Update(int siteId, UpdateSiteRequest request)
+    {
+        var result = await _siteService.UpdateAsync(
+            siteId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+        return Ok(result);
+    }
+
+    [HttpDelete("{siteId:int}")]
+    public async Task<IActionResult> Delete(int siteId)
+    {
+        var deleted = await _siteService.DeleteAsync(
+            siteId, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+        return deleted ? NoContent() : NotFound();
+    }
 }

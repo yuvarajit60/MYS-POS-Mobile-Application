@@ -6,6 +6,8 @@ import 'create_trip_entry_screen.dart';
 import 'login_screen.dart';
 import 'manage_customers_screen.dart';
 import 'manage_products_screen.dart';
+import 'manage_sites_screen.dart';
+import 'manage_vehicle_mappings_screen.dart';
 import 'reports_screen.dart';
 import 'trip_entry_reports_screen.dart';
 import 'widgets/mys_app_bar_title.dart';
@@ -67,6 +69,20 @@ class LandingScreen extends StatelessWidget {
         MaterialPageRoute(builder: (_) => const ManageCustomersScreen()),
       ),
     );
+    final sitesCard = _ActionCard(
+      icon: Icons.location_on_outlined,
+      label: 'Site',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ManageSitesScreen()),
+      ),
+    );
+    final vehicleMappingsCard = _ActionCard(
+      icon: Icons.directions_car_outlined,
+      label: 'Vehicle Mapping',
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ManageVehicleMappingsScreen()),
+      ),
+    );
     final salesOrderCard = _ActionCard(
       icon: Icons.add_shopping_cart,
       label: 'Sales Order',
@@ -98,7 +114,7 @@ class LandingScreen extends StatelessWidget {
           children: [
             _HeroBanner(),
             const SizedBox(height: 20),
-            _TileSection(title: 'Master', tiles: [productsCard, customersCard]),
+            _TileSection(title: 'Master', tiles: [productsCard, customersCard, sitesCard, vehicleMappingsCard]),
             const SizedBox(height: 18),
             _TileSection(title: 'Entry', tiles: [salesOrderCard, tripEntryCard]),
             const SizedBox(height: 18),

@@ -10,15 +10,12 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._internal();
 
-  /// Temporary: an ngrok tunnel to the dev machine's local API, so the app
-  /// can be tested over real mobile data (not just the office Wi-Fi). This
-  /// URL changes every time the ngrok tunnel is restarted on the dev side —
-  /// swap it for the real hosted API's URL once that's deployed.
-  static const String _publicApiUrl = 'https://corned-unfair-unrivaled.ngrok-free.dev';
+  /// The real hosted API, deployed on Render.
+  static const String _publicApiUrl = 'https://mys-pos-mobile-application.onrender.com';
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:5263';
-    if (Platform.isAndroid) return _publicApiUrl;
+    if (Platform.isAndroid || Platform.isIOS) return _publicApiUrl;
     return 'http://localhost:5263';
   }
 
@@ -29,9 +26,6 @@ class ApiClient {
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
-      // Harmless when not using ngrok; prevents ngrok's free-tier browser
-      // interstitial page from ever intercepting API responses.
-      headers: {'ngrok-skip-browser-warning': 'true'},
     ));
 
     client.interceptors.add(InterceptorsWrapper(

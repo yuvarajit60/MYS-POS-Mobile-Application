@@ -47,6 +47,8 @@ builder.Services.AddScoped<ISiteService, SiteService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ITripEntryService, TripEntryService>();
 builder.Services.AddScoped<ITripEntryReportService, TripEntryReportService>();
+builder.Services.AddScoped<IVehicleService, VehicleService>();
+builder.Services.AddScoped<IEmployeeVehicleMappingService, EmployeeVehicleMappingService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<ISmsGateway, SmsGateway>();
