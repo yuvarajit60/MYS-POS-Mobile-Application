@@ -20,6 +20,21 @@ public class DeliveryReportsController : ControllerBase
 
     [HttpGet("summary")]
     public async Task<ActionResult<IReadOnlyList<DeliverySummaryDto>>> Summary(
-        [FromQuery] int? customerId, [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate)
-        => Ok(await _deliveryReportService.GetSummaryAsync(User.GetLocationId(), customerId, fromDate, toDate));
+        [FromQuery] int? customerId, [FromQuery] string? deliveryNo,
+        [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate)
+        => Ok(await _deliveryReportService.GetSummaryAsync(User.GetLocationId(), customerId, deliveryNo, fromDate, toDate));
+
+    // DeliveryNo is passed as a query param (not a path segment) because it
+    // contains slashes (e.g. "DLV/25-26/0001") which would otherwise clash
+    // with ASP.NET Core's path routing.
+    [HttpGet("detail")]
+    public async Task<ActionResult<DeliveryDetailDto>> Detail([FromQuery] string deliveryNo)
+    {
+        var detail = await _deliveryReportService.GetDeliveryDetailAsync(User.GetLocationId(), deliveryNo);
+        return detail is null ? NotFound() : Ok(detail);
+    }
+
+    [HttpGet("delivery-numbers")]
+    public async Task<ActionResult<IReadOnlyList<DeliveryNumberDto>>> DeliveryNumbers([FromQuery] string? search)
+        => Ok(await _deliveryReportService.SearchDeliveryNumbersAsync(User.GetLocationId(), search));
 }

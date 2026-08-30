@@ -4,15 +4,16 @@ import 'package:printing/printing.dart';
 import '../core/company_provider.dart';
 import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
+import '../models/delivery_number.dart';
 import '../models/delivery_summary.dart';
 import '../services/customer_service.dart';
 import '../services/delivery_report_service.dart';
+import 'delivery_detail_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 
-/// Flat list report — DELIVERY_DETAILS has no header record and each row
-/// is already final (Delivery Entry can't be edited after saving), so
-/// unlike Sales Order/Trip Entry reports there's no drill-down detail
-/// screen here, just the list itself.
+/// Mirrors TripEntryReportsScreen — one row per DeliveryNo (every line saved
+/// in a single Delivery Entry submission shares the same number), tap to
+/// drill into the individual product lines.
 class DeliveryReportsScreen extends StatefulWidget {
   const DeliveryReportsScreen({super.key});
 
@@ -26,6 +27,7 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
 
   Customer? _selectedCustomer;
+  DeliveryNumber? _selectedDeliveryNumber;
   DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _toDate = DateTime.now();
 
@@ -33,10 +35,22 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
   String? _error;
   List<DeliverySummary>? _rows;
 
+  double get _totalQty => _rows?.fold<double>(0, (sum, r) => sum + r.totalQty) ?? 0;
+
   @override
   void initState() {
     super.initState();
     _generate();
+  }
+
+  Future<void> _pickDeliveryNumber() async {
+    final deliveryNumber = await showSearchPicker<DeliveryNumber>(
+      context: context,
+      title: 'Search delivery no (leave blank for all)',
+      search: _reportService.searchDeliveryNumbers,
+      itemLabel: (d) => d.deliveryNo,
+    );
+    if (deliveryNumber != null) setState(() => _selectedDeliveryNumber = deliveryNumber);
   }
 
   Future<void> _pickCustomer() async {
@@ -69,6 +83,7 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
     try {
       final rows = await _reportService.getSummary(
         customerId: _selectedCustomer?.customerId,
+        deliveryNo: _selectedDeliveryNumber?.deliveryNo,
         fromDate: _fromDate,
         toDate: _toDate,
       );
@@ -104,6 +119,23 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  InkWell(
+                    onTap: _pickDeliveryNumber,
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: 'Delivery No',
+                        suffixIcon: _selectedDeliveryNumber == null
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => setState(() => _selectedDeliveryNumber = null),
+                              ),
+                      ),
+                      child: Text(_selectedDeliveryNumber?.deliveryNo ?? 'All Deliveries'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   InkWell(
                     onTap: _pickCustomer,
                     child: InputDecorator(
@@ -184,22 +216,26 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
         for (final row in rows)
           Card(
             child: ListTile(
-              title: Text('${row.productName}  •  ${row.deliveryNo}'),
+              title: Text(row.customerName),
               subtitle: Text(
-                '${row.customerName}  |  ${row.salesOrderNo}\n'
-                '${_dateFormat.format(row.deliveryDate)}  •  ${row.driverName}${row.vehicleNumber != null ? ' • ${row.vehicleNumber}' : ''}',
+                '${row.deliveryNo}  |  ${_dateFormat.format(row.deliveryDate)}\n'
+                '${row.driverName}${row.vehicleNumber != null ? ' • ${row.vehicleNumber}' : ''}  •  ${row.lineCount} item${row.lineCount == 1 ? '' : 's'}',
               ),
               isThreeLine: true,
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(row.deliveryQty.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('Bal: ${row.balanceQty.toStringAsFixed(0)}', style: Theme.of(context).textTheme.bodySmall),
-                ],
+              trailing: Text(row.totalQty.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => DeliveryDetailScreen(deliveryNo: row.deliveryNo)),
               ),
             ),
           ),
+        const Divider(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(_totalQty.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
       ],
     );
   }

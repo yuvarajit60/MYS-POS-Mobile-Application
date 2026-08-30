@@ -1,13 +1,26 @@
 namespace AMSEL.MobileApi.Data.Dto;
 
 public record DeliverySummaryDto(
-    int DeliveryId,
     string DeliveryNo,
     DateTime DeliveryDate,
-    string SalesOrderNo,
     string CustomerName,
+    string DriverName,
+    string? VehicleNumber,
+    decimal TotalQty,
+    int LineCount);
+
+public record DeliveryLineDetailDto(
+    string SalesOrderNo,
     string ProductName,
     decimal DeliveryQty,
-    decimal BalanceQty,
+    decimal BalanceQty);
+
+public record DeliveryDetailDto(
+    string DeliveryNo,
+    DateTime DeliveryDate,
+    string CustomerName,
     string DriverName,
-    string? VehicleNumber);
+    string? VehicleNumber,
+    List<DeliveryLineDetailDto> Lines);
+
+public record DeliveryNumberDto(string DeliveryNo);
