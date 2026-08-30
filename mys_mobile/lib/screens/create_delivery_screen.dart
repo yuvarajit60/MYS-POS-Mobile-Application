@@ -108,13 +108,13 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
     setState(() => _saving = true);
     try {
-      await _deliveryService.create(
+      final result = await _deliveryService.create(
         driver: _selectedDriver!,
         vehicleNumber: _vehicleNumberController.text.trim(),
         lines: linesToSave,
       );
       if (!mounted) return;
-      _showMessage('Delivery saved.');
+      _showMessage('Delivery saved: ${result.deliveryNo}');
       Navigator.of(context).pop();
     } on DeliveryServiceException catch (e) {
       _showMessage(e.message);

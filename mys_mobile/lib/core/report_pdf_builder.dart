@@ -351,9 +351,10 @@ class ReportPdfBuilder {
         ),
         build: (context) => [
           pw.TableHelper.fromTextArray(
-            headers: ['Date', 'Sales Order', 'Customer', 'Product', 'Delivered', 'Balance', 'Driver', 'Vehicle'],
+            headers: ['Delivery No', 'Date', 'Sales Order', 'Customer', 'Product', 'Delivered', 'Balance', 'Driver', 'Vehicle'],
             data: rows
                 .map((r) => [
+                      r.deliveryNo,
                       _dateFormat.format(r.deliveryDate),
                       r.salesOrderNo,
                       r.customerName,

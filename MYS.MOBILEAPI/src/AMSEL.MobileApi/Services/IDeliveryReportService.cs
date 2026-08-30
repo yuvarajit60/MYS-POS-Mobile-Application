@@ -28,7 +28,7 @@ public class DeliveryReportService : IDeliveryReportService
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<DeliverySummaryDto>(
             """
-            SELECT DD.DELIVERYID AS DeliveryId, DD.CREATE_DATE AS DeliveryDate, SO.ENTRYNO AS SalesOrderNo,
+            SELECT DD.DELIVERYID AS DeliveryId, ISNULL(DD.DELIVERYNO, '') AS DeliveryNo, DD.CREATE_DATE AS DeliveryDate, SO.ENTRYNO AS SalesOrderNo,
                    C.CUSTOMERNAME AS CustomerName, ISNULL(PR.PRODUCTNAME, '') AS ProductName,
                    DD.DELIVERYQTY AS DeliveryQty, DD.BALANCEQTY AS BalanceQty,
                    ISNULL(E.EMPLOYEENAME, '') AS DriverName, DD.VEHICLENUMBER AS VehicleNumber

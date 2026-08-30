@@ -9,6 +9,12 @@ class DeliveryServiceException implements Exception {
   DeliveryServiceException(this.message);
 }
 
+class DeliveryResult {
+  final int linesSaved;
+  final String deliveryNo;
+  DeliveryResult({required this.linesSaved, required this.deliveryNo});
+}
+
 class DeliveryService {
   Future<List<Customer>> searchPendingCustomers(String query) async {
     final response = await ApiClient.instance.dio.get('/api/deliveries/pending-customers', queryParameters: {'search': query});
@@ -24,13 +30,13 @@ class DeliveryService {
     }
   }
 
-  Future<void> create({
+  Future<DeliveryResult> create({
     required Driver driver,
     required String vehicleNumber,
     required List<DeliveryLine> lines,
   }) async {
     try {
-      await ApiClient.instance.dio.post('/api/deliveries', data: {
+      final response = await ApiClient.instance.dio.post('/api/deliveries', data: {
         'driverEmployeeId': driver.employeeId,
         'vehicleNumber': vehicleNumber,
         'lines': lines
@@ -42,6 +48,8 @@ class DeliveryService {
                 })
             .toList(),
       });
+      final data = response.data as Map<String, dynamic>;
+      return DeliveryResult(linesSaved: data['linesSaved'] as int, deliveryNo: data['deliveryNo'] as String);
     } on DioException catch (e) {
       throw DeliveryServiceException(_messageFrom(e, 'Could not save the delivery.'));
     }

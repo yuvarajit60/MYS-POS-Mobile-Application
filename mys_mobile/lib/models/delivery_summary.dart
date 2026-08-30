@@ -1,5 +1,6 @@
 class DeliverySummary {
   final int deliveryId;
+  final String deliveryNo;
   final DateTime deliveryDate;
   final String salesOrderNo;
   final String customerName;
@@ -11,6 +12,7 @@ class DeliverySummary {
 
   DeliverySummary({
     required this.deliveryId,
+    required this.deliveryNo,
     required this.deliveryDate,
     required this.salesOrderNo,
     required this.customerName,
@@ -23,6 +25,7 @@ class DeliverySummary {
 
   factory DeliverySummary.fromJson(Map<String, dynamic> json) => DeliverySummary(
         deliveryId: json['deliveryId'] as int,
+        deliveryNo: json['deliveryNo'] as String? ?? '',
         deliveryDate: DateTime.parse(json['deliveryDate'] as String),
         salesOrderNo: json['salesOrderNo'] as String,
         customerName: json['customerName'] as String,

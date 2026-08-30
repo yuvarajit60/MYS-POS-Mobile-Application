@@ -184,7 +184,7 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
         for (final row in rows)
           Card(
             child: ListTile(
-              title: Text(row.productName),
+              title: Text('${row.productName}  •  ${row.deliveryNo}'),
               subtitle: Text(
                 '${row.customerName}  |  ${row.salesOrderNo}\n'
                 '${_dateFormat.format(row.deliveryDate)}  •  ${row.driverName}${row.vehicleNumber != null ? ' • ${row.vehicleNumber}' : ''}',

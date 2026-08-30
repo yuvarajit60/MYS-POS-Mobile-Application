@@ -2,6 +2,7 @@ namespace AMSEL.MobileApi.Data.Dto;
 
 public record DeliverySummaryDto(
     int DeliveryId,
+    string DeliveryNo,
     DateTime DeliveryDate,
     string SalesOrderNo,
     string CustomerName,

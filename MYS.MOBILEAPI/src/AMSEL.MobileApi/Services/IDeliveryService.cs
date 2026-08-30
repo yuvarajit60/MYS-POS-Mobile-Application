@@ -101,8 +101,13 @@ public class DeliveryService : IDeliveryService
         };
         command.Parameters.Add(linesParam);
 
+        var deliveryNoParam = new SqlParameter("@DELIVERYNO", SqlDbType.VarChar, -1) { Direction = ParameterDirection.Output };
+        command.Parameters.Add(deliveryNoParam);
+
         await command.ExecuteNonQueryAsync();
 
-        return new CreateDeliveryResponse(request.Lines.Count);
+        var deliveryNo = deliveryNoParam.Value as string ?? "";
+
+        return new CreateDeliveryResponse(request.Lines.Count, deliveryNo);
     }
 }

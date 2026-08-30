@@ -14,4 +14,4 @@ public record DeliveryLineRequest(int SalesOrderDetId, int SalesOrderId, int Pro
 
 public record CreateDeliveryRequest(int DriverEmployeeId, string VehicleNumber, List<DeliveryLineRequest> Lines);
 
-public record CreateDeliveryResponse(int LinesSaved);
+public record CreateDeliveryResponse(int LinesSaved, string DeliveryNo);

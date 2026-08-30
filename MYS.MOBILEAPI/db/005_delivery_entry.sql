@@ -13,6 +13,13 @@
   (`WITH (TABLOCKX)`) elsewhere in this schema, not something new
   introduced by this script.
 
+  DELIVERYNO is generated via the existing dbo.SP_GENERATETRANNO using
+  TRANSACTIONS.NAME = 'DELIVERY' (row already present in the live DB,
+  SHORTNAME 'DLV/25-26/') — the same convention SALESORDER/TRIPENTRY use
+  for their own entry numbers. One number is generated per submitted
+  batch and stamped on every line inserted from that batch, since
+  DELIVERY_DETAILS has no separate header row to hold it once.
+
   All-or-nothing: if ANY line in the submitted batch fails its balance
   check (e.g. someone else delivered it in the meantime), the whole
   batch is rolled back — there is no partial save, matching the
@@ -51,7 +58,8 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY
     @DRIVERID      INT,
     @VEHICLENUMBER VARCHAR(50),
     @CREATEUSER    VARCHAR(50),
-    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY
+    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY,
+    @DELIVERYNO    VARCHAR(MAX) OUTPUT
 )
 AS
 BEGIN
@@ -105,6 +113,14 @@ BEGIN
             RETURN;
         END
 
+        -- One DELIVERYNO per submitted batch (DELIVERY_DETAILS has no header
+        -- row, so every line in this batch shares the same number).
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'DELIVERY',
+             @TRANNO = @DELIVERYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
         -- Legacy no-identity table: serialize ID generation the same way
         -- SP_GENERATETRANNO serializes TRANSACTIONS.LASTNO.
         DECLARE @NextId INT;
@@ -115,10 +131,10 @@ BEGIN
             FROM #DeliveryLines
         )
         INSERT INTO dbo.DELIVERY_DETAILS
-            (DELIVERYID, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
+            (DELIVERYID, DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
              DRIVERID, VEHICLENUMBER, CREATE_DATE, CREATE_USER)
         SELECT
-            @NextId + RN, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
+            @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
             (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
             @DRIVERID, @VEHICLENUMBER, GETDATE(), @CREATEUSER
         FROM Numbered;

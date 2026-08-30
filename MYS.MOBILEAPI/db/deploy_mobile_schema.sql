@@ -17,7 +17,10 @@
   database but not in real production when compared directly on 2026-08-27;
   see that file's header for the risk note on the EMPLOYEE.ISDRIVER column add),
   AND 005_delivery_entry.sql's objects (Delivery Entry — see that file's
-  header for the DELIVERY_DETAILS no-IDENTITY design note).
+  header for the DELIVERY_DETAILS no-IDENTITY design note), AND
+  006_delivery_tranno_seed.sql's fix (a DELIVERY row was missing from
+  dbo.TRANSACTIONS for the active location, so DELIVERYNO generation
+  returned NULL until seeded — see that file's header).
 
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
@@ -437,7 +440,8 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY
     @DRIVERID      INT,
     @VEHICLENUMBER VARCHAR(50),
     @CREATEUSER    VARCHAR(50),
-    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY
+    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY,
+    @DELIVERYNO    VARCHAR(MAX) OUTPUT
 )
 AS
 BEGIN
@@ -488,6 +492,12 @@ BEGIN
             RETURN;
         END
 
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'DELIVERY',
+             @TRANNO = @DELIVERYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
         DECLARE @NextId INT;
         SELECT @NextId = ISNULL(MAX(DELIVERYID), 0) FROM dbo.DELIVERY_DETAILS WITH (TABLOCKX, HOLDLOCK);
 
@@ -496,10 +506,10 @@ BEGIN
             FROM #DeliveryLines
         )
         INSERT INTO dbo.DELIVERY_DETAILS
-            (DELIVERYID, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
+            (DELIVERYID, DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
              DRIVERID, VEHICLENUMBER, CREATE_DATE, CREATE_USER)
         SELECT
-            @NextId + RN, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
+            @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
             (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
             @DRIVERID, @VEHICLENUMBER, GETDATE(), @CREATEUSER
         FROM Numbered;
@@ -518,4 +528,18 @@ BEGIN
         THROW;
     END CATCH
 END
+GO
+
+------------------------------------------------------------
+-- 8. Delivery numbering prerequisite (see 006_delivery_tranno_seed.sql) —
+--    dbo.TRANSACTIONS needs a NAME='DELIVERY' row for EVERY location, or
+--    SP_GENERATETRANNO's location-scoped lookup silently returns NULL.
+------------------------------------------------------------
+INSERT INTO dbo.TRANSACTIONS (NAME, SHORTNAME, LOCATIONID, LASTNO)
+SELECT 'DELIVERY', 'DLV/25-26/', L.LOCATIONID, 0
+FROM dbo.LOCATION L
+WHERE NOT EXISTS (
+    SELECT 1 FROM dbo.TRANSACTIONS T
+    WHERE T.NAME = 'DELIVERY' AND T.LOCATIONID = L.LOCATIONID
+);
 GO
