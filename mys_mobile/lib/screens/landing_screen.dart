@@ -1,17 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/session.dart';
-import 'create_delivery_screen.dart';
-import 'create_sales_order_screen.dart';
 import 'create_trip_entry_screen.dart';
-import 'delivery_reports_screen.dart';
 import 'login_screen.dart';
-import 'manage_customers_screen.dart';
-import 'manage_products_screen.dart';
-import 'manage_sites_screen.dart';
-import 'manage_vehicle_mappings_screen.dart';
-import 'reports_screen.dart';
-import 'trip_entry_reports_screen.dart';
+import 'main_shell_screen.dart';
 import 'widgets/mys_app_bar_title.dart';
 
 class LandingScreen extends StatelessWidget {
@@ -57,88 +49,8 @@ class LandingScreen extends StatelessWidget {
       );
     }
 
-    final productsCard = _ActionCard(
-      icon: Icons.inventory_2_outlined,
-      label: 'Product',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ManageProductsScreen()),
-      ),
-    );
-    final customersCard = _ActionCard(
-      icon: Icons.people_alt_outlined,
-      label: 'Customer',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ManageCustomersScreen()),
-      ),
-    );
-    final sitesCard = _ActionCard(
-      icon: Icons.location_on_outlined,
-      label: 'Site',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ManageSitesScreen()),
-      ),
-    );
-    final vehicleMappingsCard = _ActionCard(
-      icon: Icons.directions_car_outlined,
-      label: 'Vehicle Mapping',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ManageVehicleMappingsScreen()),
-      ),
-    );
-    final salesOrderCard = _ActionCard(
-      icon: Icons.add_shopping_cart,
-      label: 'Sales Order',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CreateSalesOrderScreen()),
-      ),
-    );
-    final salesOrderReportCard = _ActionCard(
-      icon: Icons.assessment_outlined,
-      label: 'Sales Order Report',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ReportsScreen()),
-      ),
-    );
-    final tripEntryReportCard = _ActionCard(
-      icon: Icons.receipt_long_outlined,
-      label: 'Trip Entry Report',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const TripEntryReportsScreen()),
-      ),
-    );
-    final deliveryCard = _ActionCard(
-      icon: Icons.local_shipping,
-      label: 'Delivery Entry',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
-      ),
-    );
-    final deliveryReportCard = _ActionCard(
-      icon: Icons.fact_check_outlined,
-      label: 'Delivery Report',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const DeliveryReportsScreen()),
-      ),
-    );
-
-    return Scaffold(
-      appBar: AppBar(title: const MysAppBarTitle(), toolbarHeight: 68, actions: [_logoutButton(context)]),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _HeroBanner(),
-            const SizedBox(height: 20),
-            _TileSection(title: 'Master', tiles: [productsCard, customersCard, sitesCard, vehicleMappingsCard]),
-            const SizedBox(height: 18),
-            _TileSection(title: 'Entry', tiles: [salesOrderCard, tripEntryCard, deliveryCard]),
-            const SizedBox(height: 18),
-            _TileSection(title: 'Report', tiles: [salesOrderReportCard, tripEntryReportCard, deliveryReportCard]),
-          ],
-        ),
-      ),
-    );
+    // Non-drivers get the full bottom-nav shell (Home/Entries/Reports/More).
+    return const MainShellScreen();
   }
 
   Widget _logoutButton(BuildContext context) => IconButton(
