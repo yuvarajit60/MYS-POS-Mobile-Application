@@ -11,17 +11,20 @@
   002 immediately replaces them anyway. Idempotent — safe to re-run.
 
   Also includes 003_trip_entry.sql's objects (Trip Entry, added later —
-  see that file's header for the METERORHOURSID convention it introduces)
-  AND 004_prod_prerequisites.sql's objects (EMPLOYEE.ISDRIVER, PRODUCT_DETAILS,
+  see that file's header for the METERORHOURSID convention it introduces),
+  004_prod_prerequisites.sql's objects (EMPLOYEE.ISDRIVER, PRODUCT_DETAILS,
   EMPLOYEE_VEHICLE_MAPPING — these turned out to exist in the dev/test
   database but not in real production when compared directly on 2026-08-27;
-  see that file's header for the risk note on the EMPLOYEE.ISDRIVER column add).
+  see that file's header for the risk note on the EMPLOYEE.ISDRIVER column add),
+  AND 005_delivery_entry.sql's objects (Delivery Entry — see that file's
+  header for the DELIVERY_DETAILS no-IDENTITY design note).
 
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
             PRODUCTGROUP, BRAND, TYPE, SALESORDER, SALESORDER_DETAILS,
-            COMPANY, TRANSACTIONS, SITE, VEHICLE, TRIPENTRY, TRIPENTRY_DETAILS
+            COMPANY, TRANSACTIONS, SITE, VEHICLE, TRIPENTRY, TRIPENTRY_DETAILS,
+            DELIVERY_DETAILS
     Stored procedure: dbo.SP_GENERATETRANNO
     (PRODUCT_DETAILS and EMPLOYEE_VEHICLE_MAPPING moved out of this list —
     this script now creates them itself if missing, per 004.)
@@ -403,5 +406,116 @@ BEGIN
         CREATEDEMPLOYEEID  INT          NOT NULL,
         MODIFYEDEMPLOYEEID INT          NOT NULL
     );
+END
+GO
+
+------------------------------------------------------------
+-- 7. Delivery Entry (see 005_delivery_entry.sql for the full design note —
+--    DELIVERY_DETAILS has no IDENTITY/PK, IDs are generated via a locked
+--    MAX+1, same idiom SP_GENERATETRANNO already uses for TRANSACTIONS).
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_DELIVERY', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY;
+GO
+
+IF TYPE_ID(N'dbo.TVP_MOBILE_DELIVERY_LINES') IS NOT NULL
+    DROP TYPE dbo.TVP_MOBILE_DELIVERY_LINES;
+GO
+
+CREATE TYPE dbo.TVP_MOBILE_DELIVERY_LINES AS TABLE
+(
+    SALESORDERDETID INT           NOT NULL,
+    SALESORDERID    INT           NOT NULL,
+    PRODUCTID       INT           NOT NULL,
+    DELIVERYQTY     NUMERIC(18,3) NOT NULL
+);
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY
+(
+    @LOCATIONID    INT,
+    @DRIVERID      INT,
+    @VEHICLENUMBER VARCHAR(50),
+    @CREATEUSER    VARCHAR(50),
+    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        IF OBJECT_ID('tempdb..#DeliveryLines') IS NOT NULL DROP TABLE #DeliveryLines;
+
+        SELECT
+            L.SALESORDERDETID, L.SALESORDERID, L.PRODUCTID, L.DELIVERYQTY AS CURRENTDELIVERY,
+            SOD.SALESQTY, SOD.DELIVERYQTY AS ALREADYDELIVERED
+        INTO #DeliveryLines
+        FROM @LINES L
+        INNER JOIN dbo.SALESORDER_DETAILS SOD WITH (UPDLOCK, HOLDLOCK) ON SOD.SALESORDERDETID = L.SALESORDERDETID
+        INNER JOIN dbo.SALESORDER SO ON SO.SALESORDERID = SOD.SALESORDERID
+        WHERE SO.LOCATIONID = @LOCATIONID AND SO.CANCEL = 0;
+
+        IF (SELECT COUNT(*) FROM #DeliveryLines) <> (SELECT COUNT(*) FROM @LINES)
+        BEGIN
+            RAISERROR('One or more sales order lines no longer exist or belong to a different location.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        IF EXISTS (SELECT 1 FROM #DeliveryLines WHERE CURRENTDELIVERY <= 0)
+        BEGIN
+            RAISERROR('Delivery quantity must be greater than zero.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        IF EXISTS (SELECT 1 FROM #DeliveryLines WHERE CURRENTDELIVERY > (SALESQTY - ALREADYDELIVERED))
+        BEGIN
+            RAISERROR('One or more lines exceed their remaining balance quantity - someone may have already delivered part of this order. Refresh and try again.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        DECLARE @NextId INT;
+        SELECT @NextId = ISNULL(MAX(DELIVERYID), 0) FROM dbo.DELIVERY_DETAILS WITH (TABLOCKX, HOLDLOCK);
+
+        ;WITH Numbered AS (
+            SELECT *, ROW_NUMBER() OVER (ORDER BY SALESORDERDETID) AS RN
+            FROM #DeliveryLines
+        )
+        INSERT INTO dbo.DELIVERY_DETAILS
+            (DELIVERYID, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
+             DRIVERID, VEHICLENUMBER, CREATE_DATE, CREATE_USER)
+        SELECT
+            @NextId + RN, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
+            (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
+            @DRIVERID, @VEHICLENUMBER, GETDATE(), @CREATEUSER
+        FROM Numbered;
+
+        UPDATE SOD
+        SET SOD.DELIVERYQTY = SOD.DELIVERYQTY + DL.CURRENTDELIVERY
+        FROM dbo.SALESORDER_DETAILS SOD
+        INNER JOIN #DeliveryLines DL ON DL.SALESORDERDETID = SOD.SALESORDERDETID;
+
+        DROP TABLE #DeliveryLines;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #DeliveryLines;
+        THROW;
+    END CATCH
 END
 GO

@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/company.dart';
+import '../models/delivery_summary.dart';
 import '../models/order_detail.dart';
 import '../models/sales_order_summary.dart';
 import '../models/trip_entry_detail.dart';
@@ -312,6 +313,61 @@ class ReportPdfBuilder {
                     style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<pw.Document> buildDeliverySummary({
+    required List<DeliverySummary> rows,
+    required Company? company,
+    required String? customerName,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _companyHeader(company),
+            pw.SizedBox(height: 10),
+            pw.Text('Delivery Report', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Period: ${_dateFormat.format(fromDate)} to ${_dateFormat.format(toDate)}'
+              '${customerName != null ? '   |   Customer: $customerName' : '   |   All Customers'}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.Divider(),
+          ],
+        ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Date', 'Sales Order', 'Customer', 'Product', 'Delivered', 'Balance', 'Driver', 'Vehicle'],
+            data: rows
+                .map((r) => [
+                      _dateFormat.format(r.deliveryDate),
+                      r.salesOrderNo,
+                      r.customerName,
+                      r.productName,
+                      _amountFormat.format(r.deliveryQty),
+                      _amountFormat.format(r.balanceQty),
+                      r.driverName,
+                      r.vehicleNumber ?? '-',
+                    ])
+                .toList(),
+            cellAlignments: {4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight},
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 8),
           ),
         ],
       ),
