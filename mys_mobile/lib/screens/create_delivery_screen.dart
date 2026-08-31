@@ -1,11 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/customer.dart';
 import '../models/delivery_line.dart';
 import '../models/driver.dart';
+import '../models/vehicle.dart';
 import '../services/delivery_service.dart';
 import '../services/employee_service.dart';
+import '../services/vehicle_service.dart';
 import 'widgets/delivery_line_items_grid.dart';
 import 'widgets/search_picker_sheet.dart';
+
+/// Vehicle numbers (e.g. "TN33BL8268") are always uppercase letters/digits,
+/// max 10 characters — enforced as the rep types, not just on save.
+class _VehicleNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final upper = newValue.text.toUpperCase();
+    final filtered = upper.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final truncated = filtered.length > 10 ? filtered.substring(0, 10) : filtered;
+    return TextEditingValue(text: truncated, selection: TextSelection.collapsed(offset: truncated.length));
+  }
+}
 
 /// Records delivery of already-created Sales Order lines. Deliberately
 /// create-only, with no edit path at all — once saved, SALESORDER_DETAILS.
@@ -22,6 +37,7 @@ class CreateDeliveryScreen extends StatefulWidget {
 class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   final _deliveryService = DeliveryService();
   final _employeeService = EmployeeService();
+  final _vehicleService = VehicleService();
   final _vehicleNumberController = TextEditingController();
 
   Customer? _selectedCustomer;
@@ -71,8 +87,23 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     if (!mounted) return;
     setState(() {
       _selectedDriver = driver;
-      _vehicleNumberController.text = vehicle.vehicleName ?? '';
+      _vehicleNumberController.text = _normalizeVehicleNo(vehicle.vehicleName ?? '');
     });
+  }
+
+  Future<void> _pickVehicle() async {
+    final vehicle = await showSearchPicker<Vehicle>(
+      context: context,
+      title: 'Search vehicle number',
+      search: _vehicleService.search,
+      itemLabel: (v) => v.vehicleName,
+    );
+    if (vehicle != null) setState(() => _vehicleNumberController.text = _normalizeVehicleNo(vehicle.vehicleName));
+  }
+
+  String _normalizeVehicleNo(String value) {
+    final upper = value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    return upper.length > 10 ? upper.substring(0, 10) : upper;
   }
 
   void _onCurrentDeliveryChanged(int index, double value) {
@@ -176,10 +207,17 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _vehicleNumberController,
-                decoration: const InputDecoration(
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [_VehicleNumberFormatter()],
+                decoration: InputDecoration(
                   labelText: 'Vehicle No',
-                  border: OutlineInputBorder(),
-                  helperText: 'Auto-filled from the driver\'s mapped vehicle — edit if delivering in a different one.',
+                  border: const OutlineInputBorder(),
+                  helperText: 'Auto-filled from the driver\'s mapped vehicle — edit or pick another if needed.',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.list_alt),
+                    tooltip: 'Pick from all vehicles',
+                    onPressed: _pickVehicle,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

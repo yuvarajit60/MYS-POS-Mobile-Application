@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
 
@@ -72,6 +73,7 @@ class _RequestOtpScreenState extends State<RequestOtpScreen> {
                 TextFormField(
                   controller: _mobileController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                   decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),

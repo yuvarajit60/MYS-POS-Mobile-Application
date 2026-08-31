@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/city.dart';
 import '../models/customer.dart';
 import '../models/customer_detail.dart';
@@ -159,6 +160,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               TextFormField(
                 controller: _mobileController,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                 decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),

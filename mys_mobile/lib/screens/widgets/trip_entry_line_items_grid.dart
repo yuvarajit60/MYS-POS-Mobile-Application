@@ -78,6 +78,15 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
     super.dispose();
   }
 
+  String _meterDurationText(double meterStart, double meterClose) {
+    final totalMinutes = ((meterClose - meterStart) / 10 * 60).round();
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
+    if (hours > 0) return '${hours}h';
+    return '${minutes}m';
+  }
+
   String _formatDateTime(DateTime? value) {
     if (value == null) return 'Tap to set';
     final d = value;
@@ -165,7 +174,7 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
                     ),
                   ],
                 )
-              else
+              else ...[
                 Row(
                   children: [
                     Expanded(
@@ -195,6 +204,17 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
                     ),
                   ],
                 ),
+                if (line.meterStart != null && line.meterClose != null && line.meterClose! > line.meterStart!)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      // 1 point (0.1 on the meter) = 6 minutes, so 10 points = 1 hour —
+                      // matches line.qty, which is already (close - start) / 10 hours.
+                      'Duration: ${_meterDurationText(line.meterStart!, line.meterClose!)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+              ],
               const SizedBox(height: 8),
               if (line.vehicleName != null)
                 Padding(
