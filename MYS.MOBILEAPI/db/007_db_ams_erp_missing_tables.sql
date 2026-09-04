@@ -1,0 +1,173 @@
+/*
+  db_ams_erp — unlike DB_AMS_ERP_SMS and db_ams_pos_test, this database's
+  desktop-app schema was never upgraded with the Site / Trip Entry /
+  Delivery features at all: dbo.SITE, dbo.TRIPENTRY, dbo.TRIPENTRY_DETAILS
+  and dbo.DELIVERY_DETAILS don't exist, and dbo.SALESORDER_DETAILS is
+  missing DELIVERYQTY. Confirmed via direct read-only comparison against
+  db_ams_pos_test on 2026-09-04 (117 base tables present, all of the core
+  desktop tables the mobile Sales Order feature needs — CUSTOMER, PRODUCT,
+  SALESORDER, EMPLOYEE, etc. — but zero tables matching SITE/TRIP/DELIVER).
+
+  deploy_mobile_schema.sql normally treats these four tables as
+  pre-existing desktop-app objects it never creates — that assumption is
+  false for db_ams_erp, so this script must run BEFORE deploy_mobile_schema.sql
+  on this specific database. Table shapes below were reverse-engineered
+  column-for-column from db_ams_pos_test's real schema (sys.columns), with
+  one deliberate deviation: TRIPENTRY_DETAILS.METERSTART/METERCLOSE are
+  created here as NUMERIC(18,1) instead of copying db_ams_pos_test's
+  NUMERIC(18,0) — see 008_tripentry_meter_precision_fix.sql for why (that
+  file fixes the same bug on the databases where the table already exists).
+
+  Idempotent — safe to re-run, and safe to run against a database that
+  already has some or all of these objects (each guarded individually).
+*/
+
+------------------------------------------------------------
+-- 1. SALESORDER_DETAILS.DELIVERYQTY
+------------------------------------------------------------
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SALESORDER_DETAILS' AND COLUMN_NAME = 'DELIVERYQTY'
+)
+BEGIN
+    ALTER TABLE dbo.SALESORDER_DETAILS
+        ADD DELIVERYQTY INT NOT NULL CONSTRAINT DF_SALESORDER_DETAILS_DELIVERYQTY DEFAULT 0;
+END
+GO
+
+------------------------------------------------------------
+-- 2. SITE
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SITE', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.SITE
+    (
+        SITEID              INT IDENTITY(1,1) NOT NULL,
+        SITENAME            VARCHAR(50)  NULL,
+        AREANAME            VARCHAR(50)  NULL,
+        CITYID              INT          NOT NULL CONSTRAINT DF_SITE_CITYID DEFAULT 0,
+        STATUS              BIT          NOT NULL CONSTRAINT DF_SITE_STATUS DEFAULT 0,
+        CUSTOMERID          INT          NOT NULL,
+        CREATEDLOCATIONID   INT          NOT NULL CONSTRAINT DF_SITE_CREATEDLOCATIONID DEFAULT 0,
+        MODIFYEDLOCATIONID  INT          NOT NULL CONSTRAINT DF_SITE_MODIFYEDLOCATIONID DEFAULT 0,
+        CREATEDUSERID       INT          NOT NULL CONSTRAINT DF_SITE_CREATEDUSERID DEFAULT 0,
+        LASTMODIFYEDUSERID  INT          NOT NULL CONSTRAINT DF_SITE_LASTMODIFYEDUSERID DEFAULT 0,
+        USERCREATEDDATE     DATETIME     NULL,
+        LASTMODIFYEDDATE    DATETIME     NULL,
+        CREATEDEMPLOYEEID   INT          NOT NULL CONSTRAINT DF_SITE_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID  INT          NOT NULL CONSTRAINT DF_SITE_MODIFYEDEMPLOYEEID DEFAULT 0
+    );
+END
+GO
+
+------------------------------------------------------------
+-- 3. TRIPENTRY
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.TRIPENTRY', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TRIPENTRY
+    (
+        TRIPENTRYID         INT IDENTITY(1,1) NOT NULL,
+        ENTRYNO             VARCHAR(50)   NULL,
+        ENTRYDATE           DATETIME      NULL,
+        LOCATIONID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_LOCATIONID DEFAULT 0,
+        COUNTERID           INT           NOT NULL CONSTRAINT DF_TRIPENTRY_COUNTERID DEFAULT 0,
+        MOBILENO            VARCHAR(50)   NULL,
+        CUSTOMERID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CUSTOMERID DEFAULT 0,
+        EMPLOYEEID          INT           NOT NULL,
+        SITENAME            VARCHAR(500)  NULL,
+        TAXABLEVALUE        NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_TAXABLEVALUE DEFAULT 0,
+        TOTALTAX            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_TOTALTAX DEFAULT 0,
+        ITEMVALUE           NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_ITEMVALUE DEFAULT 0,
+        ROUNDOFF            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_ROUNDOFF DEFAULT 0,
+        NETAMOUNT           NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_NETAMOUNT DEFAULT 0,
+        SELECTRATE          BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_SELECTRATE DEFAULT 0,
+        CANCELUSERID        INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCELUSERID DEFAULT 0,
+        CANCELID            INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCELID DEFAULT 0,
+        CANCEL              BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCEL DEFAULT 0,
+        CANCELDATETIME      DATETIME      NULL,
+        CREATEDLOCATIONID   INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDLOCATIONID DEFAULT 0,
+        MODIFYEDLOCATIONID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_MODIFYEDLOCATIONID DEFAULT 0,
+        CREATEDUSERID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDUSERID DEFAULT 0,
+        LASTMODIFYEDUSERID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_LASTMODIFYEDUSERID DEFAULT 0,
+        USERCREATEDDATE     DATETIME      NULL,
+        LASTMODIFYEDDATE    DATETIME      NULL,
+        CREATEDEMPLOYEEID   INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_MODIFYEDEMPLOYEEID DEFAULT 0,
+        SITEID              INT           NOT NULL CONSTRAINT DF_TRIPENTRY_SITEID DEFAULT 0,
+        TRIPNO              NVARCHAR(100) NULL,
+        TRIPDATE            DATETIME      NULL,
+        CONVERTTOSALES      BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_CONVERTTOSALES DEFAULT 0
+    );
+END
+GO
+
+------------------------------------------------------------
+-- 4. TRIPENTRY_DETAILS (METERSTART/METERCLOSE widened to NUMERIC(18,1) —
+--    see this file's header note and 008_tripentry_meter_precision_fix.sql)
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.TRIPENTRY_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TRIPENTRY_DETAILS
+    (
+        TRIPENTRYID     INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TRIPENTRYID DEFAULT 0,
+        TRIPENTRYDETID  INT IDENTITY(1,1) NOT NULL,
+        COMPANYID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_COMPANYID DEFAULT 0,
+        COUNTERID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_COUNTERID DEFAULT 0,
+        PRODUCTID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_PRODUCTID DEFAULT 0,
+        PRODUCTCODE     VARCHAR(50)   NULL,
+        HSNCODE         VARCHAR(50)   NULL,
+        BRANDID         INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_BRANDID DEFAULT 0,
+        TYPEID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TYPEID DEFAULT 0,
+        UOMID           INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_UOMID DEFAULT 0,
+        WEIGHT          NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_WEIGHT DEFAULT 0,
+        QTY             NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_QTY DEFAULT 0,
+        MRP             NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_MRP DEFAULT 0,
+        RATE            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_RATE DEFAULT 0,
+        GROSSAMOUNT     NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_GROSSAMOUNT DEFAULT 0,
+        TAXABLEVALUE    NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TAXABLEVALUE DEFAULT 0,
+        CGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_CGSTPERCENTAGE DEFAULT 0,
+        CGSTAMOUNT      NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_CGSTAMOUNT DEFAULT 0,
+        SGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_SGSTPERCENTAGE DEFAULT 0,
+        SGSTAMOUNT      NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_SGSTAMOUNT DEFAULT 0,
+        IGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_IGSTPERCENTAGE DEFAULT 0,
+        IGSTAMOUNT      NUMERIC(18,2) NOT NULL,
+        TOTALTAX        NUMERIC(18,2) NOT NULL,
+        PERRATE         NUMERIC(18,2) NOT NULL,
+        PRATE           NUMERIC(18,2) NOT NULL,
+        TOTALAMOUNT     NUMERIC(18,2) NOT NULL,
+        ENTRYID         INT           NOT NULL,
+        METERORHOURSID  INT           NULL,
+        TIMESTART       DATETIME      NULL,
+        TIMECLOSE       DATETIME      NULL,
+        METERSTART      NUMERIC(18,1) NULL,
+        METERCLOSE      NUMERIC(18,1) NULL,
+        VEHICLEID       INT           NULL
+    );
+END
+GO
+
+------------------------------------------------------------
+-- 5. DELIVERY_DETAILS (no IDENTITY/PK — matches db_ams_pos_test exactly;
+--    SP_MOBILE_CREATE_DELIVERY generates DELIVERYID itself via locked MAX+1)
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.DELIVERY_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DELIVERY_DETAILS
+    (
+        DELIVERYID       INT           NOT NULL,
+        DELIVERYNO       VARCHAR(50)   NOT NULL,
+        SALESORDERID     INT           NOT NULL,
+        SALESORDERDETID  INT           NOT NULL,
+        PRODUCTID        INT           NOT NULL,
+        DELIVERYQTY      NUMERIC(12,2) NOT NULL,
+        BALANCEQTY       NUMERIC(12,2) NOT NULL,
+        DRIVERID         INT           NOT NULL,
+        VEHICLENUMBER    VARCHAR(10)   NULL,
+        CREATE_DATE      DATETIME      NOT NULL,
+        CREATE_USER      VARCHAR(50)   NOT NULL,
+        MODIFIED_DATE    DATETIME      NULL,
+        MODIFIED_USER    VARCHAR(50)   NULL
+    );
+END
+GO

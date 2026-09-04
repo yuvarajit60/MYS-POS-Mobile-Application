@@ -22,6 +22,18 @@
   dbo.TRANSACTIONS for the active location, so DELIVERYNO generation
   returned NULL until seeded — see that file's header).
 
+  NOT included here (run separately, and only where needed — see each
+  file's own header): 007_db_ams_erp_missing_tables.sql, needed ONLY on
+  databases (e.g. db_ams_erp) that never had the desktop Site/Trip Entry/
+  Delivery schema added at all — SITE, TRIPENTRY, TRIPENTRY_DETAILS,
+  DELIVERY_DETAILS, and SALESORDER_DETAILS.DELIVERYQTY don't exist there;
+  MUST run before this script on such a database. AND
+  008_tripentry_meter_precision_fix.sql, needed on any database where
+  TRIPENTRY_DETAILS already exists with METERSTART/METERCLOSE as
+  NUMERIC(18,0) (silently rounds decimal meter readings — confirmed on
+  db_ams_pos_test and DB_AMS_ERP_SMS); not needed on a database getting
+  TRIPENTRY_DETAILS fresh from 007, which already uses the corrected type.
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
