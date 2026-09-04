@@ -32,17 +32,31 @@ public class CustomersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<CustomerDto>> Create(CreateCustomerRequest request)
     {
-        var result = await _customerService.CreateAsync(
-            request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _customerService.CreateAsync(
+                request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateCustomerException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{customerId:int}")]
     public async Task<ActionResult<CustomerDto>> Update(int customerId, UpdateCustomerRequest request)
     {
-        var result = await _customerService.UpdateAsync(
-            customerId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _customerService.UpdateAsync(
+                customerId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateCustomerException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{customerId:int}")]

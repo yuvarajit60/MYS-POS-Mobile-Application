@@ -32,17 +32,31 @@ public class SitesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SiteDetailDto>> Create(CreateSiteRequest request)
     {
-        var result = await _siteService.CreateAsync(
-            request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _siteService.CreateAsync(
+                request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateSiteNameException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{siteId:int}")]
     public async Task<ActionResult<SiteDetailDto>> Update(int siteId, UpdateSiteRequest request)
     {
-        var result = await _siteService.UpdateAsync(
-            siteId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _siteService.UpdateAsync(
+                siteId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateSiteNameException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{siteId:int}")]

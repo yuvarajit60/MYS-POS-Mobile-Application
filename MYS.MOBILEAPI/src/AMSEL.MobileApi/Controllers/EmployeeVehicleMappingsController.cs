@@ -32,15 +32,29 @@ public class EmployeeVehicleMappingsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<EmployeeVehicleMappingDto>> Create(CreateEmployeeVehicleMappingRequest request)
     {
-        var result = await _mappingService.CreateAsync(request, User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _mappingService.CreateAsync(request, User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateVehicleMappingException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{mappingId:int}")]
     public async Task<ActionResult<EmployeeVehicleMappingDto>> Update(int mappingId, UpdateEmployeeVehicleMappingRequest request)
     {
-        var result = await _mappingService.UpdateAsync(mappingId, request, User.GetUserId(), User.GetEmployeeId());
-        return Ok(result);
+        try
+        {
+            var result = await _mappingService.UpdateAsync(mappingId, request, User.GetUserId(), User.GetEmployeeId());
+            return Ok(result);
+        }
+        catch (DuplicateVehicleMappingException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{mappingId:int}")]

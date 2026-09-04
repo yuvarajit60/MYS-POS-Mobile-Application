@@ -13,6 +13,12 @@ public interface IEmployeeVehicleMappingService
     Task<bool> DeleteAsync(int mappingId);
 }
 
+public class DuplicateVehicleMappingException : Exception
+{
+    public DuplicateVehicleMappingException()
+        : base("This driver is already mapped to this vehicle for an overlapping period.") { }
+}
+
 /// <summary>
 /// EMPLOYEE_VEHICLE_MAPPING stores EMPLOYEEID/VEHICLEID as VARCHAR (legacy
 /// column typing, not something introduced here) — cast to/from INT at the
@@ -69,9 +75,45 @@ public class EmployeeVehicleMappingService : IEmployeeVehicleMappingService
             new { MappingId = mappingId });
     }
 
+    /// <summary>
+    /// Two mappings for the same driver+vehicle pair "overlap" using the
+    /// standard interval-overlap test (StartA <= EndB AND StartB <= EndA),
+    /// treating a NULL end date as "ongoing" (far-future sentinel).
+    /// </summary>
+    private async Task<bool> OverlappingMappingExistsAsync(
+        Microsoft.Data.SqlClient.SqlConnection connection, int employeeId, int vehicleId,
+        DateTime validStartDate, DateTime? validEndDate, int? excludingMappingId, Microsoft.Data.SqlClient.SqlTransaction? transaction = null)
+    {
+        var count = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM EMPLOYEE_VEHICLE_MAPPING
+            WHERE TRY_CAST(EMPLOYEEID AS INT) = @EmployeeId AND TRY_CAST(VEHICLEID AS INT) = @VehicleId
+              AND (@ExcludingMappingId IS NULL OR MAPPINGID <> @ExcludingMappingId)
+              AND VALIDSTARTDATE <= ISNULL(@ValidEndDate, '9999-12-31')
+              AND ISNULL(VALIDENDDATE, '9999-12-31') >= @ValidStartDate
+            """,
+            new
+            {
+                EmployeeId = employeeId,
+                VehicleId = vehicleId,
+                ExcludingMappingId = excludingMappingId,
+                ValidStartDate = validStartDate,
+                ValidEndDate = validEndDate,
+            },
+            transaction);
+
+        return count > 0;
+    }
+
     public async Task<EmployeeVehicleMappingDto> CreateAsync(CreateEmployeeVehicleMappingRequest request, int userId, int employeeId)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await OverlappingMappingExistsAsync(connection, request.EmployeeId, request.VehicleId, request.ValidStartDate, request.ValidEndDate, null, transaction))
+            throw new DuplicateVehicleMappingException();
+
         var mappingId = await connection.QuerySingleAsync<int>(
             """
             INSERT INTO EMPLOYEE_VEHICLE_MAPPING
@@ -92,7 +134,10 @@ public class EmployeeVehicleMappingService : IEmployeeVehicleMappingService
                 request.ValidEndDate,
                 UserId = userId,
                 EmployeeIdAudit = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return (await GetByIdAsync(mappingId))!;
     }
@@ -100,6 +145,12 @@ public class EmployeeVehicleMappingService : IEmployeeVehicleMappingService
     public async Task<EmployeeVehicleMappingDto> UpdateAsync(int mappingId, UpdateEmployeeVehicleMappingRequest request, int userId, int employeeId)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await OverlappingMappingExistsAsync(connection, request.EmployeeId, request.VehicleId, request.ValidStartDate, request.ValidEndDate, mappingId, transaction))
+            throw new DuplicateVehicleMappingException();
+
         await connection.ExecuteAsync(
             """
             UPDATE EMPLOYEE_VEHICLE_MAPPING
@@ -117,7 +168,10 @@ public class EmployeeVehicleMappingService : IEmployeeVehicleMappingService
                 request.ValidEndDate,
                 UserId = userId,
                 EmployeeIdAudit = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return (await GetByIdAsync(mappingId))!;
     }

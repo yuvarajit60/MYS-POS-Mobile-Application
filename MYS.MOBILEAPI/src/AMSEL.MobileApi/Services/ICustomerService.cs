@@ -13,6 +13,12 @@ public interface ICustomerService
     Task<bool> DeleteAsync(int customerId, int locationId, int userId, int employeeId);
 }
 
+public class DuplicateCustomerException : Exception
+{
+    public DuplicateCustomerException(string mobileNo)
+        : base($"A customer with mobile number \"{mobileNo}\" already exists.") { }
+}
+
 public class CustomerService : ICustomerService
 {
     private readonly ISqlConnectionFactory _connectionFactory;
@@ -53,6 +59,22 @@ public class CustomerService : ICustomerService
             new { CustomerId = customerId });
     }
 
+    private async Task<bool> MobileNoExistsAsync(Microsoft.Data.SqlClient.SqlConnection connection, string mobileNo, int? excludingCustomerId, Microsoft.Data.SqlClient.SqlTransaction? transaction = null)
+    {
+        if (string.IsNullOrWhiteSpace(mobileNo)) return false;
+
+        var count = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM CUSTOMER
+            WHERE STATUS = 1 AND MOBILENO = @MobileNo
+              AND (@ExcludingCustomerId IS NULL OR CUSTOMERID <> @ExcludingCustomerId)
+            """,
+            new { MobileNo = mobileNo, ExcludingCustomerId = excludingCustomerId },
+            transaction);
+
+        return count > 0;
+    }
+
     /// <summary>
     /// Mirrors the desktop CUSTOMER.vb form's field-copying convention
     /// (PRINTNAME defaults to CUSTOMERNAME, PRINTADDRESS defaults to ADDRESS)
@@ -63,6 +85,12 @@ public class CustomerService : ICustomerService
         var address = request.Address ?? "";
 
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await MobileNoExistsAsync(connection, request.MobileNo, null, transaction))
+            throw new DuplicateCustomerException(request.MobileNo);
+
         var customerId = await connection.QuerySingleAsync<int>(
             """
             INSERT INTO CUSTOMER
@@ -84,7 +112,10 @@ public class CustomerService : ICustomerService
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return new CustomerDto(customerId, request.CustomerName, request.MobileNo);
     }
@@ -94,6 +125,12 @@ public class CustomerService : ICustomerService
         var address = request.Address ?? "";
 
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await MobileNoExistsAsync(connection, request.MobileNo, customerId, transaction))
+            throw new DuplicateCustomerException(request.MobileNo);
+
         await connection.ExecuteAsync(
             """
             UPDATE CUSTOMER
@@ -113,7 +150,10 @@ public class CustomerService : ICustomerService
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return new CustomerDto(customerId, request.CustomerName, request.MobileNo);
     }

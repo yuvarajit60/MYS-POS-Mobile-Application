@@ -13,6 +13,12 @@ public interface ISiteService
     Task<bool> DeleteAsync(int siteId, int locationId, int userId, int employeeId);
 }
 
+public class DuplicateSiteNameException : Exception
+{
+    public DuplicateSiteNameException(string siteName)
+        : base($"A site named \"{siteName}\" already exists for this customer.") { }
+}
+
 /// <summary>
 /// Searched by site name (not scoped by customer) — Trip Entry picks the
 /// site first, then derives the customer from SITE.CUSTOMERID, rather than
@@ -63,9 +69,29 @@ public class SiteService : ISiteService
             new { SiteId = siteId });
     }
 
+    private async Task<bool> NameExistsAsync(Microsoft.Data.SqlClient.SqlConnection connection, int customerId, string siteName, int? excludingSiteId, Microsoft.Data.SqlClient.SqlTransaction? transaction = null)
+    {
+        var count = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM SITE
+            WHERE STATUS = 1 AND CUSTOMERID = @CustomerId AND SITENAME = @SiteName
+              AND (@ExcludingSiteId IS NULL OR SITEID <> @ExcludingSiteId)
+            """,
+            new { CustomerId = customerId, SiteName = siteName, ExcludingSiteId = excludingSiteId },
+            transaction);
+
+        return count > 0;
+    }
+
     public async Task<SiteDetailDto> CreateAsync(CreateSiteRequest request, int locationId, int userId, int employeeId)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await NameExistsAsync(connection, request.CustomerId, request.SiteName, null, transaction))
+            throw new DuplicateSiteNameException(request.SiteName);
+
         var siteId = await connection.QuerySingleAsync<int>(
             """
             INSERT INTO SITE
@@ -87,7 +113,10 @@ public class SiteService : ISiteService
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return (await GetByIdAsync(siteId))!;
     }
@@ -95,6 +124,12 @@ public class SiteService : ISiteService
     public async Task<SiteDetailDto> UpdateAsync(int siteId, UpdateSiteRequest request, int locationId, int userId, int employeeId)
     {
         using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        using var transaction = connection.BeginTransaction();
+
+        if (await NameExistsAsync(connection, request.CustomerId, request.SiteName, siteId, transaction))
+            throw new DuplicateSiteNameException(request.SiteName);
+
         await connection.ExecuteAsync(
             """
             UPDATE SITE
@@ -113,7 +148,10 @@ public class SiteService : ISiteService
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
-            });
+            },
+            transaction);
+
+        transaction.Commit();
 
         return (await GetByIdAsync(siteId))!;
     }
