@@ -162,7 +162,11 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   /// Meter (MeterClose - MeterStart, entered directly as decimal hours —
   /// e.g. 120.4 to 122.6 is a 2.2 hour / 2h12m difference) pair once both
   /// sides are set — Qty stays directly editable afterward, same as Rate,
-  /// in case the rep needs to override it.
+  /// in case the rep needs to override it. Rounded to 2 decimal places —
+  /// both because that's the billing precision this business uses, and
+  /// because dividing minutes by 60 (or subtracting decimal meter
+  /// readings) routinely produces repeating/imprecise doubles like
+  /// 2.3666666666666667 otherwise.
   void _recomputeQty(int index) {
     final line = _lines[index];
     if (line.meterOrHours == MeterOrHours.hours) {
@@ -170,7 +174,7 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       final close = line.timeClose;
       if (start != null && close != null) {
         final hours = close.difference(start).inMinutes / 60.0;
-        if (hours > 0) line.qty = hours;
+        if (hours > 0) line.qty = _roundTo2(hours);
       }
     } else {
       final start = line.meterStart;
@@ -178,10 +182,12 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       if (start != null && close != null && close > start) {
         // Meter readings are decimal hours (0.1 = 6 minutes), so the raw
         // difference is already the billable quantity.
-        line.qty = close - start;
+        line.qty = _roundTo2(close - start);
       }
     }
   }
+
+  double _roundTo2(double value) => (value * 100).round() / 100;
 
   void _onQtyChanged(int index, double newQty) => setState(() => _lines[index].qty = newQty);
 
