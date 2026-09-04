@@ -4,7 +4,8 @@ import '../../models/sales_order_line.dart';
 /// Read/edit grid for the sales-order line items. State (the list itself)
 /// lives in the parent screen so the running total can be computed alongside
 /// it — this widget just renders rows and reports rate/qty/delete changes
-/// back up. Rate defaults to the product's MRP but is editable per line;
+/// back up. MRP is shown read-only for reference; Rate defaults to the
+/// tax-exclusive price backed out of that MRP but is editable per line.
 /// TotalAmount shown is tax-inclusive (rate x qty, plus CGST + SGST).
 class LineItemsGrid extends StatelessWidget {
   final List<SalesOrderLine> lines;
@@ -55,7 +56,15 @@ class LineItemsGrid extends StatelessWidget {
               Row(
                 children: [
                   SizedBox(
-                    width: 100,
+                    width: 80,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(isDense: true, labelText: 'MRP'),
+                      child: Text(line.mrp.toStringAsFixed(2)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 90,
                     child: TextFormField(
                       key: ValueKey('rate-${line.product.productId}-$index'),
                       initialValue: line.rate.toStringAsFixed(2),
