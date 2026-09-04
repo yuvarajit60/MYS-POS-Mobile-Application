@@ -463,8 +463,8 @@ class ReportPdfBuilder {
       final close = l.timeClose != null ? _timeFormat.format(l.timeClose!) : '-';
       return 'Hours: $start-$close';
     }
-    final start = l.meterStart?.toStringAsFixed(0) ?? '-';
-    final close = l.meterClose?.toStringAsFixed(0) ?? '-';
+    final start = l.meterStart?.toStringAsFixed(1) ?? '-';
+    final close = l.meterClose?.toStringAsFixed(1) ?? '-';
     return 'Meter: $start-$close';
   }
 

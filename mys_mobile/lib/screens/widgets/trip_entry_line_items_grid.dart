@@ -79,7 +79,7 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
   }
 
   String _meterDurationText(double meterStart, double meterClose) {
-    final totalMinutes = ((meterClose - meterStart) / 10 * 60).round();
+    final totalMinutes = ((meterClose - meterStart) * 60).round();
     final hours = totalMinutes ~/ 60;
     final minutes = totalMinutes % 60;
     if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
@@ -208,8 +208,8 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      // 1 point (0.1 on the meter) = 6 minutes, so 10 points = 1 hour —
-                      // matches line.qty, which is already (close - start) / 10 hours.
+                      // Meter readings are decimal hours (0.1 = 6 minutes), so
+                      // this matches line.qty, which is just close - start.
                       'Duration: ${_meterDurationText(line.meterStart!, line.meterClose!)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),

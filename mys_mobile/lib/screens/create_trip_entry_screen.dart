@@ -121,7 +121,22 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
     });
   }
 
-  void _onMeterOrHoursChanged(int index, MeterOrHours value) => setState(() => _lines[index].meterOrHours = value);
+  // A line can only bill by Hours or by Meter, never both — switching modes
+  // clears the other mode's fields so stale readings never get saved
+  // alongside the new ones, and Qty resets until the rep fills in the
+  // newly-active pair.
+  void _onMeterOrHoursChanged(int index, MeterOrHours value) => setState(() {
+        final line = _lines[index];
+        line.meterOrHours = value;
+        if (value == MeterOrHours.hours) {
+          line.meterStart = null;
+          line.meterClose = null;
+        } else {
+          line.timeStart = null;
+          line.timeClose = null;
+        }
+        line.qty = 1;
+      });
 
   void _onTimeStartChanged(int index, DateTime value) => setState(() {
         _lines[index].timeStart = value;
@@ -144,9 +159,10 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       });
 
   /// Auto-fills Qty from the Hours (TimeClose - TimeStart, in hours) or
-  /// Meter ((MeterClose - MeterStart) / 10, since meter readings are in
-  /// tenths) pair once both sides are set — Qty stays directly editable
-  /// afterward, same as Rate, in case the rep needs to override it.
+  /// Meter (MeterClose - MeterStart, entered directly as decimal hours —
+  /// e.g. 120.4 to 122.6 is a 2.2 hour / 2h12m difference) pair once both
+  /// sides are set — Qty stays directly editable afterward, same as Rate,
+  /// in case the rep needs to override it.
   void _recomputeQty(int index) {
     final line = _lines[index];
     if (line.meterOrHours == MeterOrHours.hours) {
@@ -160,9 +176,9 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       final start = line.meterStart;
       final close = line.meterClose;
       if (start != null && close != null && close > start) {
-        // Meter readings are in tenths (e.g. 320 means 32.0), so the raw
-        // difference is divided by 10 to get the billable quantity.
-        line.qty = (close - start) / 10;
+        // Meter readings are decimal hours (0.1 = 6 minutes), so the raw
+        // difference is already the billable quantity.
+        line.qty = close - start;
       }
     }
   }

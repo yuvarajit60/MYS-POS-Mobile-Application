@@ -57,7 +57,7 @@ class _TripEntryDetailScreenState extends State<TripEntryDetailScreen> {
   String _lineSubtitle(TripEntryDetailLine line) {
     final usage = line.meterOrHours == MeterOrHours.hours
         ? 'Hours: ${line.timeStart != null ? _dateTimeFormat.format(line.timeStart!) : '-'} to ${line.timeClose != null ? _dateTimeFormat.format(line.timeClose!) : '-'}'
-        : 'Meter: ${line.meterStart?.toStringAsFixed(0) ?? '-'} to ${line.meterClose?.toStringAsFixed(0) ?? '-'}';
+        : 'Meter: ${line.meterStart?.toStringAsFixed(1) ?? '-'} to ${line.meterClose?.toStringAsFixed(1) ?? '-'}';
     final vehicle = line.vehicleName != null ? '  |  Vehicle: ${line.vehicleName}' : '';
     return '$usage$vehicle\nQty: ${line.qty == line.qty.roundToDouble() ? line.qty.toInt() : line.qty} x ${line.rate.toStringAsFixed(2)}';
   }
