@@ -20,7 +20,11 @@
   header for the DELIVERY_DETAILS no-IDENTITY design note), AND
   006_delivery_tranno_seed.sql's fix (a DELIVERY row was missing from
   dbo.TRANSACTIONS for the active location, so DELIVERYNO generation
-  returned NULL until seeded — see that file's header).
+  returned NULL until seeded — see that file's header) — sections 8 and 9
+  below cover both DELIVERY's and TRIPENTRY's numbering the same way,
+  deriving each location's fiscal-year suffix from its own SALESORDER row
+  rather than hardcoding one (a database can be on a different fiscal
+  year than the one a hardcoded value was written against).
 
   NOT included here (run separately, and only where needed — see each
   file's own header): 007_db_ams_erp_missing_tables.sql, needed ONLY on
@@ -33,6 +37,11 @@
   NUMERIC(18,0) (silently rounds decimal meter readings — confirmed on
   db_ams_pos_test and DB_AMS_ERP_SMS); not needed on a database getting
   TRIPENTRY_DETAILS fresh from 007, which already uses the corrected type.
+  AND 010_db_ams_erp_delivery_shortname_fix.sql, needed ONLY on db_ams_erp
+  specifically — an earlier run of this script's section 8 (before it
+  derived the fiscal year dynamically) inserted DELIVERY's row there with
+  a hardcoded '25-26/' suffix while every other transaction type on that
+  database is '26-27/'.
 
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
@@ -546,12 +555,40 @@ GO
 -- 8. Delivery numbering prerequisite (see 006_delivery_tranno_seed.sql) —
 --    dbo.TRANSACTIONS needs a NAME='DELIVERY' row for EVERY location, or
 --    SP_GENERATETRANNO's location-scoped lookup silently returns NULL.
+--    Fiscal-year suffix is derived from each location's own SALESORDER
+--    row rather than hardcoded — see 006's header for why (a hardcoded
+--    value produced a wrongly-stamped row on a database using a
+--    different fiscal year than the one this script was first written
+--    against).
 ------------------------------------------------------------
+;WITH DeliveryFiscalSuffix AS (
+    SELECT LOCATIONID, SUBSTRING(SHORTNAME, CHARINDEX('/', SHORTNAME) + 1, LEN(SHORTNAME)) AS Suffix
+    FROM dbo.TRANSACTIONS
+    WHERE NAME = 'SALESORDER'
+)
 INSERT INTO dbo.TRANSACTIONS (NAME, SHORTNAME, LOCATIONID, LASTNO)
-SELECT 'DELIVERY', 'DLV/25-26/', L.LOCATIONID, 0
-FROM dbo.LOCATION L
+SELECT 'DELIVERY', 'DLV/' + FS.Suffix, FS.LOCATIONID, 0
+FROM DeliveryFiscalSuffix FS
 WHERE NOT EXISTS (
     SELECT 1 FROM dbo.TRANSACTIONS T
-    WHERE T.NAME = 'DELIVERY' AND T.LOCATIONID = L.LOCATIONID
+    WHERE T.NAME = 'DELIVERY' AND T.LOCATIONID = FS.LOCATIONID
+);
+GO
+
+------------------------------------------------------------
+-- 9. Trip Entry numbering prerequisite (see 009_tripentry_tranno_seed.sql) —
+--    same idea as section 8, for NAME='TRIPENTRY'.
+------------------------------------------------------------
+;WITH TripEntryFiscalSuffix AS (
+    SELECT LOCATIONID, SUBSTRING(SHORTNAME, CHARINDEX('/', SHORTNAME) + 1, LEN(SHORTNAME)) AS Suffix
+    FROM dbo.TRANSACTIONS
+    WHERE NAME = 'SALESORDER'
+)
+INSERT INTO dbo.TRANSACTIONS (NAME, SHORTNAME, LOCATIONID, LASTNO)
+SELECT 'TRIPENTRY', 'TRI/' + FS.Suffix, FS.LOCATIONID, 0
+FROM TripEntryFiscalSuffix FS
+WHERE NOT EXISTS (
+    SELECT 1 FROM dbo.TRANSACTIONS T
+    WHERE T.NAME = 'TRIPENTRY' AND T.LOCATIONID = FS.LOCATIONID
 );
 GO
