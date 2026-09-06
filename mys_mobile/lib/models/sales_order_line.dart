@@ -1,27 +1,40 @@
 import 'product.dart';
 
-/// A row in the sales-order line-items grid. Qty and Rate are both mutable.
-/// [Product.rate] is actually PRODUCT.MRP (tax-inclusive) — Rate here
-/// defaults to the tax-EXCLUSIVE price backed out of that MRP (MRP / (1 +
-/// GST%)), since MRP already includes GST and shouldn't have it added a
-/// second time. The rep can still edit Rate per order. TotalAmount is
-/// tax-inclusive (rate x qty, plus CGST/SGST on that amount) and, so long
-/// as Rate is left at its default, comes back out to MRP x qty.
+/// A row in the sales-order line-items grid. Qty, MRP, and Rate are all
+/// mutable and kept in sync by whichever the rep edits last: MRP is
+/// tax-inclusive, Rate is tax-exclusive (MRP / (1 + GST%)), so editing
+/// either one recomputes the other from the product's own GST%. Both
+/// default from [Product.rate], which is actually PRODUCT.MRP.
+/// TotalAmount is tax-inclusive (rate x qty, plus CGST/SGST on that
+/// amount) and, so long as Rate/MRP are left at their defaults, comes
+/// back out to MRP x qty.
 class SalesOrderLine {
   final Product product;
   double qty;
+  double mrp;
   double rate;
 
-  SalesOrderLine({required this.product, this.qty = 1}) : rate = _taxExclusiveRate(product);
+  SalesOrderLine({required this.product, this.qty = 1})
+      : mrp = product.rate,
+        rate = _taxExclusiveRate(product.rate, _gstPercent(product));
 
-  /// The product's actual MRP, for display alongside the (possibly
-  /// rep-edited) tax-exclusive Rate.
-  double get mrp => product.rate;
+  double get _gstPercentValue => _gstPercent(product);
 
-  static double _taxExclusiveRate(Product product) {
-    final gstPercent = product.salesCgstPercentage + product.salesSgstPercentage;
-    return product.rate / (1 + gstPercent / 100);
+  /// Rep edited MRP (tax-inclusive) — back out the new tax-exclusive Rate.
+  void updateFromMrp(double newMrp) {
+    mrp = newMrp;
+    rate = _taxExclusiveRate(newMrp, _gstPercentValue);
   }
+
+  /// Rep edited Rate (tax-exclusive) — gross it back up to the new MRP.
+  void updateFromRate(double newRate) {
+    rate = newRate;
+    mrp = newRate * (1 + _gstPercentValue / 100);
+  }
+
+  static double _gstPercent(Product product) => product.salesCgstPercentage + product.salesSgstPercentage;
+
+  static double _taxExclusiveRate(double mrp, double gstPercent) => mrp / (1 + gstPercent / 100);
 
   double get taxableValue => rate * qty;
 

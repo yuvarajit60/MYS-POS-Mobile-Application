@@ -81,8 +81,12 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
     setState(() => _lines[index].qty = newQty);
   }
 
+  void _onMrpChanged(int index, double newMrp) {
+    setState(() => _lines[index].updateFromMrp(newMrp));
+  }
+
   void _onRateChanged(int index, double newRate) {
-    setState(() => _lines[index].rate = newRate);
+    setState(() => _lines[index].updateFromRate(newRate));
   }
 
   void _onDeleteLine(int index) {
@@ -169,6 +173,7 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
             LineItemsGrid(
               lines: _lines,
               onQtyChanged: _onQtyChanged,
+              onMrpChanged: _onMrpChanged,
               onRateChanged: _onRateChanged,
               onDelete: _onDeleteLine,
             ),
