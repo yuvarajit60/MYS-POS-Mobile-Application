@@ -1,0 +1,145 @@
+/*
+  SP-only piece of 013_product_price_history.sql, for databases that
+  already have PRODUCTDETAILID on both PRODUCT_DETAILS and
+  SALESORDER_DETAILS (confirmed on db_ams_erp and DB_AMS_ERP_SMS on
+  2026-09-07 — the user added both columns by hand there already).
+
+  Updates SP_MOBILE_CREATE_SALESORDER to stamp each SALESORDER_DETAILS
+  row with whichever PRODUCT_DETAILS row is current (VALID_END_DATE IS
+  NULL AND VALID = 1) for that product at the moment of sale — see
+  013_product_price_history.sql's header for the full design note.
+
+  The Product-update price-history logic itself (closing out the old
+  PRODUCT_DETAILS row and opening a new one when MRP changes) lives
+  entirely in ProductService.cs, not in any stored procedure — it takes
+  effect automatically once the backend redeploys, no DB change needed
+  for that part.
+
+  Idempotent — safe to re-run.
+*/
+
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_SALESORDER', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER
+(
+    @LOCATIONID        INT,
+    @CUSTOMERID        INT,
+    @CUSTOMERNAME      VARCHAR(100),
+    @MOBILENO          VARCHAR(50),
+    @SHIPPINGADDRESS   VARCHAR(500),
+    @CREATEDUSERID     INT,
+    @CREATEDEMPLOYEEID INT,
+    @LINES             dbo.TVP_MOBILE_SALESORDER_LINES READONLY,
+    @SALESORDERID      INT           OUTPUT,
+    @ENTRYNO           VARCHAR(MAX)  OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    IF OBJECT_ID('tempdb..#LinePricing') IS NOT NULL DROP TABLE #LinePricing;
+
+    SELECT
+        L.PRODUCTID, L.QTY, L.RATE,
+        PR.MRP, PR.HSNCODE, PR.BRANDID, PR.TYPEID, PR.UOMID,
+        ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
+        ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
+        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE,
+        ISNULL(PD.PRODUCTDETAILID, 0) AS PRODUCTDETAILID
+    INTO #LinePricing
+    FROM @LINES L
+    INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID
+    OUTER APPLY (
+        -- TOP 1 (not a plain JOIN) so a product with more than one
+        -- "current" PRODUCT_DETAILS row (shouldn't happen) can never fan
+        -- out this line into duplicates — picks the most recently
+        -- created one instead.
+        SELECT TOP 1 PDI.PRODUCTDETAILID
+        FROM dbo.PRODUCT_DETAILS PDI
+        WHERE PDI.PRODUCTID = L.PRODUCTID AND PDI.VALID_END_DATE IS NULL AND PDI.VALID = 1
+        ORDER BY PDI.PRODUCTDETAILID DESC
+    ) PD;
+
+    IF (SELECT COUNT(*) FROM #LinePricing) <> (SELECT COUNT(*) FROM @LINES)
+    BEGIN
+        RAISERROR('One or more products no longer exist.', 16, 1);
+        DROP TABLE #LinePricing;
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'SALESORDER',
+             @TRANNO = @ENTRYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
+        DECLARE @RawNetAmount NUMERIC(18,2), @RoundedNetAmount NUMERIC(18,2);
+
+        SELECT @RawNetAmount = SUM(RATE * QTY)
+                              + SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2))
+        FROM #LinePricing;
+
+        SET @RoundedNetAmount = ROUND(@RawNetAmount, 0);
+
+        INSERT INTO dbo.SALESORDER
+            (ENTRYNO, ENTRYDATE, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID, PAYMENTMODE,
+             TAXABLEVALUE, TOTALTAX, ITEMVALUE, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, ROUNDOFF, NETAMOUNT,
+             SELECTRATE, CASHAMOUNT, CARDAMOUNT, RECEIVEDAMOUNT, REFUNDAMOUNT, SETTLEMENT, SETTLEMENTID, PAYMENT,
+             CANCELUSERID, CANCELID, CANCEL, CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
+             USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
+             SHIPPINGADDRESS, CUSTOMERNAME, OrderDate)
+        SELECT
+            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
+            SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            SUM(RATE * QTY), 0, 0, (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
+            GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
+            @SHIPPINGADDRESS, @CUSTOMERNAME, CAST(GETDATE() AS DATE)
+        FROM #LinePricing;
+
+        SET @SALESORDERID = SCOPE_IDENTITY();
+
+        INSERT INTO dbo.SALESORDER_DETAILS
+            (SALESORDERID, COMPANYID, COUNTERID, BARCODE, PRODUCTID, PRODUCTCODE, HSNCODE, BRANDID, TYPEID, UOMID,
+             WEIGHT, QTY, MRP, RATE, GROSSAMOUNT, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, OTHERDISCOUNTAMOUNT,
+             TAXABLEVALUE, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT,
+             TOTALTAX, PERRATE, PRATE, PTAX, TOTALAMOUNT, STOCKQTY, MFGDATE, EXPDATE, ENTRYID,
+             PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY, PRODUCTDETAILID)
+        SELECT
+            @SALESORDERID, 1, 0, '', PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
+            0, QTY, MRP, RATE, RATE * QTY, 0, 0, 0,
+            RATE * QTY,
+            SALESCGSTPERCENTAGE, ROUND(RATE * QTY * SALESCGSTPERCENTAGE / 100.0, 2),
+            SALESSGSTPERCENTAGE, ROUND(RATE * QTY * SALESSGSTPERCENTAGE / 100.0, 2),
+            SALESIGSTPERCENTAGE, ROUND(RATE * QTY * SALESIGSTPERCENTAGE / 100.0, 2),
+            ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            RATE, 0, 0,
+            RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            0, NULL, NULL, 0,
+            0, 0, 0, QTY, PRODUCTDETAILID
+        FROM #LinePricing;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #LinePricing;
+        THROW;
+    END CATCH
+
+    DROP TABLE #LinePricing;
+END
+GO

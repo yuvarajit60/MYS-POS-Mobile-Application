@@ -2,8 +2,13 @@ import 'package:flutter/foundation.dart';
 import '../models/company.dart';
 import '../services/company_service.dart';
 
-/// Fetches the configured company name once (it's shown pre-login too, e.g.
-/// on the sign-in screen) and caches it in memory for the app bar title.
+/// Fetches the configured company name and caches it in memory for the app
+/// bar title. `/api/company` now requires auth (each tenant has its own
+/// company record, so an anonymous pre-login request has no way to know
+/// which one to return) — the login screen's app bar just shows the
+/// generic "MYS Sales" fallback until the user is actually signed in.
+/// [reset] must be called on every login/logout so a cached company from
+/// one tenant's session never leaks into another's — see Session.
 class CompanyProvider extends ChangeNotifier {
   CompanyProvider._internal();
   static final CompanyProvider instance = CompanyProvider._internal();
@@ -20,5 +25,10 @@ class CompanyProvider extends ChangeNotifier {
     } finally {
       _fetching = false;
     }
+  }
+
+  void reset() {
+    company = null;
+    notifyListeners();
   }
 }

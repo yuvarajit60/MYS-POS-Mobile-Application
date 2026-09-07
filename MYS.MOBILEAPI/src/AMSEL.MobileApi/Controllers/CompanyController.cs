@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AMSEL.MobileApi.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/company")]
 public class CompanyController : ControllerBase
 {
@@ -16,10 +17,13 @@ public class CompanyController : ControllerBase
         _companyService = companyService;
     }
 
-    // Anonymous: the company name/branding needs to display on the login
-    // screen too, before any session exists. Not sensitive information.
+    // Requires auth (unlike before multi-tenancy) — which tenant's company
+    // to show can't be known for an anonymous pre-login request, so this
+    // now resolves the same way every other endpoint does: the tenant-
+    // resolution middleware reads it off the JWT's "tenant" claim. The
+    // login screen's app bar just shows the generic fallback title until
+    // the user is actually signed in — see CompanyProvider's doc comment.
     [HttpGet]
-    [AllowAnonymous]
     public async Task<ActionResult<CompanyDto>> Get()
     {
         var company = await _companyService.GetAsync();

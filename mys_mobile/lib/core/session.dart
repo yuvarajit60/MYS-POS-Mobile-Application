@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
+import 'company_provider.dart';
 import 'secure_storage.dart';
 
 /// In-memory access token + the "am I logged in" state the app boots against.
@@ -53,6 +54,10 @@ class Session extends ChangeNotifier {
     accessTokenExpiresAt = DateTime.parse(json['accessTokenExpiresAt'] as String);
     isDriver = json['isDriver'] as bool? ?? false;
     await SecureStorage.instance.setRefreshToken(json['refreshToken'] as String);
+    // A fresh login/refresh may belong to a different tenant than whatever
+    // was cached before (different customer, same device) — drop any
+    // stale company so the app bar refetches under the now-current tenant.
+    CompanyProvider.instance.reset();
     notifyListeners();
   }
 
@@ -61,6 +66,7 @@ class Session extends ChangeNotifier {
     accessTokenExpiresAt = null;
     isDriver = false;
     await SecureStorage.instance.clear();
+    CompanyProvider.instance.reset();
     notifyListeners();
   }
 }
