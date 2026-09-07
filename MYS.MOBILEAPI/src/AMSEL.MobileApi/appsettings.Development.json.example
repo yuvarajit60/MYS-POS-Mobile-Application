@@ -6,7 +6,7 @@
     }
   },
   "ConnectionStrings": {
-    "MobileApiDb": "Server=.\\SQLEXPRESS;Database=db_ams_erp;User Id=<user>;Password=<password>;TrustServerCertificate=True;"
+    "ControlDb": "Server=.\\SQLEXPRESS;Database=MYS_MOBILE_CONTROL;User Id=<user>;Password=<password>;TrustServerCertificate=True;"
   },
   "Jwt": {
     "SigningKey": "DEV-ONLY-SIGNING-KEY-REPLACE-IN-PRODUCTION-32BYTESMIN"

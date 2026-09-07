@@ -8,7 +8,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ConnectionStrings__MobileApiDb: ${CONNECTION_STRING}
+      ConnectionStrings__ControlDb: ${CONNECTION_STRING}
       Jwt__SigningKey: ${JWT_SIGNING_KEY}
       Sms__Username: ${SMS_USERNAME}
       Sms__Password: ${SMS_PASSWORD}

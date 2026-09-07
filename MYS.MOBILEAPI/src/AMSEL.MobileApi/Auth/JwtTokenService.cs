@@ -8,7 +8,7 @@ namespace AMSEL.MobileApi.Auth;
 
 public interface IJwtTokenService
 {
-    (string Token, DateTime ExpiresAt) GenerateAccessToken(AuthenticatedUser user);
+    (string Token, DateTime ExpiresAt) GenerateAccessToken(AuthenticatedUser user, string tenantCode);
 }
 
 public class JwtTokenService : IJwtTokenService
@@ -20,7 +20,7 @@ public class JwtTokenService : IJwtTokenService
         _configuration = configuration;
     }
 
-    public (string Token, DateTime ExpiresAt) GenerateAccessToken(AuthenticatedUser user)
+    public (string Token, DateTime ExpiresAt) GenerateAccessToken(AuthenticatedUser user, string tenantCode)
     {
         var signingKey = _configuration["Jwt:SigningKey"]
             ?? throw new InvalidOperationException("Jwt:SigningKey is not configured.");
@@ -38,6 +38,7 @@ public class JwtTokenService : IJwtTokenService
             new("employeeId", user.EmployeeId.ToString()),
             new("branchId", user.BranchId.ToString()),
             new("isDriver", user.IsDriver ? "1" : "0"),
+            new("tenant", tenantCode),
         };
 
         var credentials = new SigningCredentials(

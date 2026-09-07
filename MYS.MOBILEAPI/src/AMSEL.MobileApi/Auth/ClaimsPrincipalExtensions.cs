@@ -18,4 +18,7 @@ public static class ClaimsPrincipalExtensions
 
     public static bool GetIsDriver(this ClaimsPrincipal user) =>
         user.FindFirstValue("isDriver") == "1";
+
+    public static string GetTenantCode(this ClaimsPrincipal user) =>
+        user.FindFirstValue("tenant")!;
 }

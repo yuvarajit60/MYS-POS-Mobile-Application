@@ -31,7 +31,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddSingleton<ITenantRegistry, TenantRegistry>();
+builder.Services.AddScoped<ISqlConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
@@ -109,6 +112,26 @@ app.UseExceptionHandler(errorApp =>
 
 app.UseCors();
 app.UseAuthentication();
+
+// For already-authenticated requests, resolve the tenant from the JWT's
+// "tenant" claim and populate ITenantContext before any controller runs —
+// login/refresh/OTP endpoints have no JWT yet at this point, so they
+// resolve and set their own tenant directly (see AuthController/OtpController).
+app.Use(async (context, next) =>
+{
+    var tenantCode = context.User.FindFirst("tenant")?.Value;
+    if (!string.IsNullOrEmpty(tenantCode))
+    {
+        var tenantRegistry = context.RequestServices.GetRequiredService<ITenantRegistry>();
+        var tenant = await tenantRegistry.GetByCodeAsync(tenantCode);
+        if (tenant is not null)
+        {
+            context.RequestServices.GetRequiredService<ITenantContext>().ConnectionString = tenant.ConnectionString;
+        }
+    }
+    await next();
+});
+
 app.UseAuthorization();
 
 app.MapControllers();

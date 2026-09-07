@@ -38,8 +38,10 @@ ecosystem.
 
 ### 3. Set the environment variables on the host
 In the host's dashboard/secrets panel (not committed to git), set:
-- `ConnectionStrings__MobileApiDb` = the value from `.env`'s
-  `CONNECTION_STRING`
+- `ConnectionStrings__ControlDb` = the multi-tenant directory database's
+  connection string (see `db/011_tenant_directory.sql`) — NOT any one
+  customer's own database; every tenant's real connection string is a row
+  in that directory instead
 - `Jwt__SigningKey` = the value from `.env`'s `JWT_SIGNING_KEY`
 - `Sms__Username` / `Sms__Password` = leave blank for now (no working SMS
   provider yet — OTP requests will 502 until this is set, same as local)
