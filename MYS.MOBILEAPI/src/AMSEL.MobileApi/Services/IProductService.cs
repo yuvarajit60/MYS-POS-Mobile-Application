@@ -154,6 +154,20 @@ public class ProductService : IProductService
         return new ProductDto(productId, request.ProductName, request.Mrp, cgst, sgst);
     }
 
+    private record CurrentProductDetail(decimal RetailRate, decimal PurchaseRate);
+
+    /// <summary>
+    /// PRODUCT_DETAILS is a price-history table, not a one-row-per-product
+    /// mirror: editing MRP closes out the current row (VALID_END_DATE =
+    /// GETDATE(), VALID = 0) and opens a new one at the new price
+    /// (VALID_END_DATE = NULL, VALID = 1), rather than overwriting SALE_RATE
+    /// in place — so SP_MOBILE_CREATE_SALESORDER can stamp each sale with
+    /// exactly which price point (PRODUCTDETAILID) was in effect at the
+    /// time, even after the price changes again later. RETAIL_RATE/
+    /// PURCHASE_RATE carry forward from the row being closed, since this
+    /// form never collects them itself. When MRP hasn't actually changed,
+    /// no new row is opened — the current one just gets its name kept in sync.
+    /// </summary>
     public async Task<ProductDto> UpdateAsync(int productId, UpdateProductRequest request, string username, int userId, int employeeId)
     {
         var cgst = request.SalesGstPercentage / 2m;
@@ -165,6 +179,9 @@ public class ProductService : IProductService
 
         if (await NameExistsAsync(connection, request.ProductName, productId, transaction))
             throw new DuplicateProductNameException(request.ProductName);
+
+        var previousMrp = await connection.ExecuteScalarAsync<decimal?>(
+            "SELECT MRP FROM PRODUCT WHERE PRODUCTID = @ProductId", new { ProductId = productId }, transaction);
 
         await connection.ExecuteAsync(
             """
@@ -190,15 +207,57 @@ public class ProductService : IProductService
             },
             transaction);
 
-        await connection.ExecuteAsync(
-            """
-            UPDATE PRODUCT_DETAILS
-            SET PRODUCTNAME = @ProductName, SALE_RATE = @Mrp,
-                MODIFIED_DATE = GETDATE(), MODIFIED_USER = @Username
-            WHERE PRODUCTID = @ProductId AND VALID = 1
-            """,
-            new { ProductId = productId, request.ProductName, request.Mrp, Username = username },
-            transaction);
+        if (previousMrp is not null && previousMrp.Value != request.Mrp)
+        {
+            var currentDetail = await connection.QuerySingleOrDefaultAsync<CurrentProductDetail>(
+                """
+                SELECT RETAIL_RATE AS RetailRate, PURCHASE_RATE AS PurchaseRate
+                FROM PRODUCT_DETAILS
+                WHERE PRODUCTID = @ProductId AND VALID_END_DATE IS NULL AND VALID = 1
+                """,
+                new { ProductId = productId },
+                transaction);
+
+            await connection.ExecuteAsync(
+                """
+                UPDATE PRODUCT_DETAILS
+                SET VALID_END_DATE = GETDATE(), VALID = 0
+                WHERE PRODUCTID = @ProductId AND VALID_END_DATE IS NULL AND VALID = 1
+                """,
+                new { ProductId = productId },
+                transaction);
+
+            await connection.ExecuteAsync(
+                """
+                INSERT INTO PRODUCT_DETAILS
+                    (PRODUCTID, PRODUCTNAME, SALE_RATE, RETAIL_RATE, PURCHASE_RATE,
+                     VALID_START_DATE, VALID_END_DATE, CREATE_DATE, CREATE_USER, VALID)
+                VALUES
+                    (@ProductId, @ProductName, @Mrp, @RetailRate, @PurchaseRate,
+                     GETDATE(), NULL, GETDATE(), @Username, 1)
+                """,
+                new
+                {
+                    ProductId = productId,
+                    request.ProductName,
+                    request.Mrp,
+                    RetailRate = currentDetail?.RetailRate ?? 0,
+                    PurchaseRate = currentDetail?.PurchaseRate ?? 0,
+                    Username = username,
+                },
+                transaction);
+        }
+        else
+        {
+            await connection.ExecuteAsync(
+                """
+                UPDATE PRODUCT_DETAILS
+                SET PRODUCTNAME = @ProductName, MODIFIED_DATE = GETDATE(), MODIFIED_USER = @Username
+                WHERE PRODUCTID = @ProductId AND VALID_END_DATE IS NULL AND VALID = 1
+                """,
+                new { ProductId = productId, request.ProductName, Username = username },
+                transaction);
+        }
 
         transaction.Commit();
 

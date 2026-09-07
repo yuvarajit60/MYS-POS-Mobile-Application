@@ -26,22 +26,25 @@
   rather than hardcoding one (a database can be on a different fiscal
   year than the one a hardcoded value was written against).
 
-  NOT included here (run separately, and only where needed — see each
-  file's own header): 007_db_ams_erp_missing_tables.sql, needed ONLY on
-  databases (e.g. db_ams_erp) that never had the desktop Site/Trip Entry/
-  Delivery schema added at all — SITE, TRIPENTRY, TRIPENTRY_DETAILS,
-  DELIVERY_DETAILS, and SALESORDER_DETAILS.DELIVERYQTY don't exist there;
-  MUST run before this script on such a database. AND
-  008_tripentry_meter_precision_fix.sql, needed on any database where
-  TRIPENTRY_DETAILS already exists with METERSTART/METERCLOSE as
-  NUMERIC(18,0) (silently rounds decimal meter readings — confirmed on
-  db_ams_pos_test and DB_AMS_ERP_SMS); not needed on a database getting
-  TRIPENTRY_DETAILS fresh from 007, which already uses the corrected type.
-  AND 010_db_ams_erp_delivery_shortname_fix.sql, needed ONLY on db_ams_erp
+  Sections 10 and 11 below fold in 007_db_ams_erp_missing_tables.sql and
+  008_tripentry_meter_precision_fix.sql respectively — both are existence-
+  guarded (IF OBJECT_ID/IF NOT EXISTS), so they're safe to include
+  unconditionally here: on a database that already has SITE/TRIPENTRY/
+  TRIPENTRY_DETAILS in active use (e.g. DB_AMS_ERP_SMS, which already had
+  10 real Trip Entry records at the time this was written), those CREATEs
+  are skipped and only the genuinely missing pieces (DELIVERY_DETAILS,
+  SALESORDER_DETAILS.DELIVERYQTY, the METERSTART/METERCLOSE precision
+  fix) are applied; on a database with none of it at all (e.g. db_ams_erp),
+  everything gets created fresh with the corrected NUMERIC(18,1) already
+  baked in, so section 11 is simply a no-op there.
+
+  NOT included here (run separately — see its own header):
+  010_db_ams_erp_delivery_shortname_fix.sql, needed ONLY on db_ams_erp
   specifically — an earlier run of this script's section 8 (before it
   derived the fiscal year dynamically) inserted DELIVERY's row there with
   a hardcoded '25-26/' suffix while every other transaction type on that
-  database is '26-27/'.
+  database is '26-27/'. This is a one-off correction for a mistake, not a
+  general prerequisite, so it isn't folded in here.
 
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
@@ -111,6 +114,30 @@ BEGIN
 END
 GO
 
+-- PRODUCTDETAILID prerequisite for section 4's proc below (full context
+-- in section 12 near the end of this file, which repeats this idempotent
+-- check — harmless — since column references, unlike table references,
+-- are validated immediately at CREATE PROCEDURE time against whatever
+-- the table's current shape is, not deferred).
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'PRODUCT_DETAILS' AND COLUMN_NAME = 'PRODUCTDETAILID'
+)
+BEGIN
+    ALTER TABLE dbo.PRODUCT_DETAILS ADD PRODUCTDETAILID INT IDENTITY(1,1);
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SALESORDER_DETAILS' AND COLUMN_NAME = 'PRODUCTDETAILID'
+)
+BEGIN
+    ALTER TABLE dbo.SALESORDER_DETAILS
+        ADD PRODUCTDETAILID INT NOT NULL CONSTRAINT DF_SALESORDER_DETAILS_PRODUCTDETAILID DEFAULT 0;
+END
+GO
+
 ------------------------------------------------------------
 -- 4. Sales-order creation proc (final version)
 --    Writes ONLY to dbo.SALESORDER / dbo.SALESORDER_DETAILS.
@@ -149,10 +176,21 @@ BEGIN
         PR.MRP, PR.HSNCODE, PR.BRANDID, PR.TYPEID, PR.UOMID,
         ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
         ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
-        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE
+        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE,
+        ISNULL(PD.PRODUCTDETAILID, 0) AS PRODUCTDETAILID
     INTO #LinePricing
     FROM @LINES L
-    INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID;
+    INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID
+    OUTER APPLY (
+        -- TOP 1 (not a plain JOIN) so a product with more than one
+        -- "current" PRODUCT_DETAILS row (shouldn't happen, but see
+        -- 013_product_price_history.sql) can never fan out this line
+        -- into duplicates — picks the most recently created one instead.
+        SELECT TOP 1 PDI.PRODUCTDETAILID
+        FROM dbo.PRODUCT_DETAILS PDI
+        WHERE PDI.PRODUCTID = L.PRODUCTID AND PDI.VALID_END_DATE IS NULL AND PDI.VALID = 1
+        ORDER BY PDI.PRODUCTDETAILID DESC
+    ) PD;
 
     IF (SELECT COUNT(*) FROM #LinePricing) <> (SELECT COUNT(*) FROM @LINES)
     BEGIN
@@ -202,7 +240,7 @@ BEGIN
              WEIGHT, QTY, MRP, RATE, GROSSAMOUNT, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, OTHERDISCOUNTAMOUNT,
              TAXABLEVALUE, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT,
              TOTALTAX, PERRATE, PRATE, PTAX, TOTALAMOUNT, STOCKQTY, MFGDATE, EXPDATE, ENTRYID,
-             PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY)
+             PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY, PRODUCTDETAILID)
         SELECT
             @SALESORDERID, 1, 0, '', PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
             0, QTY, MRP, RATE, RATE * QTY, 0, 0, 0,
@@ -214,7 +252,7 @@ BEGIN
             RATE, 0, 0,
             RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
             0, NULL, NULL, 0,
-            0, 0, 0, QTY
+            0, 0, 0, QTY, PRODUCTDETAILID
         FROM #LinePricing;
 
         COMMIT TRANSACTION;
@@ -398,6 +436,7 @@ IF OBJECT_ID(N'dbo.PRODUCT_DETAILS', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.PRODUCT_DETAILS
     (
+        PRODUCTDETAILID  INT IDENTITY(1,1) NOT NULL,
         PRODUCTID        INT           NOT NULL,
         PRODUCTNAME      VARCHAR(100)  NOT NULL,
         SALE_RATE        NUMERIC(12,2) NOT NULL,
@@ -592,3 +631,190 @@ WHERE NOT EXISTS (
     WHERE T.NAME = 'TRIPENTRY' AND T.LOCATIONID = FS.LOCATIONID
 );
 GO
+
+------------------------------------------------------------
+-- 10. Desktop tables the mobile app needs but some databases never had
+--     added at all (folded in from 007_db_ams_erp_missing_tables.sql —
+--     see that file's header for the full story and where each table's
+--     shape was reverse-engineered from). Every piece here is existence-
+--     guarded, so this is a no-op wherever it already exists.
+------------------------------------------------------------
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SALESORDER_DETAILS' AND COLUMN_NAME = 'DELIVERYQTY'
+)
+BEGIN
+    ALTER TABLE dbo.SALESORDER_DETAILS
+        ADD DELIVERYQTY INT NOT NULL CONSTRAINT DF_SALESORDER_DETAILS_DELIVERYQTY DEFAULT 0;
+END
+GO
+
+IF OBJECT_ID(N'dbo.SITE', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.SITE
+    (
+        SITEID              INT IDENTITY(1,1) NOT NULL,
+        SITENAME            VARCHAR(50)  NULL,
+        AREANAME            VARCHAR(50)  NULL,
+        CITYID              INT          NOT NULL CONSTRAINT DF_SITE_CITYID DEFAULT 0,
+        STATUS              BIT          NOT NULL CONSTRAINT DF_SITE_STATUS DEFAULT 0,
+        CUSTOMERID          INT          NOT NULL,
+        CREATEDLOCATIONID   INT          NOT NULL CONSTRAINT DF_SITE_CREATEDLOCATIONID DEFAULT 0,
+        MODIFYEDLOCATIONID  INT          NOT NULL CONSTRAINT DF_SITE_MODIFYEDLOCATIONID DEFAULT 0,
+        CREATEDUSERID       INT          NOT NULL CONSTRAINT DF_SITE_CREATEDUSERID DEFAULT 0,
+        LASTMODIFYEDUSERID  INT          NOT NULL CONSTRAINT DF_SITE_LASTMODIFYEDUSERID DEFAULT 0,
+        USERCREATEDDATE     DATETIME     NULL,
+        LASTMODIFYEDDATE    DATETIME     NULL,
+        CREATEDEMPLOYEEID   INT          NOT NULL CONSTRAINT DF_SITE_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID  INT          NOT NULL CONSTRAINT DF_SITE_MODIFYEDEMPLOYEEID DEFAULT 0
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.TRIPENTRY', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TRIPENTRY
+    (
+        TRIPENTRYID         INT IDENTITY(1,1) NOT NULL,
+        ENTRYNO             VARCHAR(50)   NULL,
+        ENTRYDATE           DATETIME      NULL,
+        LOCATIONID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_LOCATIONID DEFAULT 0,
+        COUNTERID           INT           NOT NULL CONSTRAINT DF_TRIPENTRY_COUNTERID DEFAULT 0,
+        MOBILENO            VARCHAR(50)   NULL,
+        CUSTOMERID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CUSTOMERID DEFAULT 0,
+        EMPLOYEEID          INT           NOT NULL,
+        SITENAME            VARCHAR(500)  NULL,
+        TAXABLEVALUE        NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_TAXABLEVALUE DEFAULT 0,
+        TOTALTAX            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_TOTALTAX DEFAULT 0,
+        ITEMVALUE           NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_ITEMVALUE DEFAULT 0,
+        ROUNDOFF            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_ROUNDOFF DEFAULT 0,
+        NETAMOUNT           NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_NETAMOUNT DEFAULT 0,
+        SELECTRATE          BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_SELECTRATE DEFAULT 0,
+        CANCELUSERID        INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCELUSERID DEFAULT 0,
+        CANCELID            INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCELID DEFAULT 0,
+        CANCEL              BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_CANCEL DEFAULT 0,
+        CANCELDATETIME      DATETIME      NULL,
+        CREATEDLOCATIONID   INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDLOCATIONID DEFAULT 0,
+        MODIFYEDLOCATIONID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_MODIFYEDLOCATIONID DEFAULT 0,
+        CREATEDUSERID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDUSERID DEFAULT 0,
+        LASTMODIFYEDUSERID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_LASTMODIFYEDUSERID DEFAULT 0,
+        USERCREATEDDATE     DATETIME      NULL,
+        LASTMODIFYEDDATE    DATETIME      NULL,
+        CREATEDEMPLOYEEID   INT           NOT NULL CONSTRAINT DF_TRIPENTRY_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID  INT           NOT NULL CONSTRAINT DF_TRIPENTRY_MODIFYEDEMPLOYEEID DEFAULT 0,
+        SITEID              INT           NOT NULL CONSTRAINT DF_TRIPENTRY_SITEID DEFAULT 0,
+        TRIPNO              NVARCHAR(100) NULL,
+        TRIPDATE            DATETIME      NULL,
+        CONVERTTOSALES      BIT           NOT NULL CONSTRAINT DF_TRIPENTRY_CONVERTTOSALES DEFAULT 0
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.TRIPENTRY_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TRIPENTRY_DETAILS
+    (
+        TRIPENTRYID     INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TRIPENTRYID DEFAULT 0,
+        TRIPENTRYDETID  INT IDENTITY(1,1) NOT NULL,
+        COMPANYID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_COMPANYID DEFAULT 0,
+        COUNTERID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_COUNTERID DEFAULT 0,
+        PRODUCTID       INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_PRODUCTID DEFAULT 0,
+        PRODUCTCODE     VARCHAR(50)   NULL,
+        HSNCODE         VARCHAR(50)   NULL,
+        BRANDID         INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_BRANDID DEFAULT 0,
+        TYPEID          INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TYPEID DEFAULT 0,
+        UOMID           INT           NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_UOMID DEFAULT 0,
+        WEIGHT          NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_WEIGHT DEFAULT 0,
+        QTY             NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_QTY DEFAULT 0,
+        MRP             NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_MRP DEFAULT 0,
+        RATE            NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_RATE DEFAULT 0,
+        GROSSAMOUNT     NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_GROSSAMOUNT DEFAULT 0,
+        TAXABLEVALUE    NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_TAXABLEVALUE DEFAULT 0,
+        CGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_CGSTPERCENTAGE DEFAULT 0,
+        CGSTAMOUNT      NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_CGSTAMOUNT DEFAULT 0,
+        SGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_SGSTPERCENTAGE DEFAULT 0,
+        SGSTAMOUNT      NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_SGSTAMOUNT DEFAULT 0,
+        IGSTPERCENTAGE  NUMERIC(18,2) NOT NULL CONSTRAINT DF_TRIPENTRY_DETAILS_IGSTPERCENTAGE DEFAULT 0,
+        IGSTAMOUNT      NUMERIC(18,2) NOT NULL,
+        TOTALTAX        NUMERIC(18,2) NOT NULL,
+        PERRATE         NUMERIC(18,2) NOT NULL,
+        PRATE           NUMERIC(18,2) NOT NULL,
+        TOTALAMOUNT     NUMERIC(18,2) NOT NULL,
+        ENTRYID         INT           NOT NULL,
+        METERORHOURSID  INT           NULL,
+        TIMESTART       DATETIME      NULL,
+        TIMECLOSE       DATETIME      NULL,
+        METERSTART      NUMERIC(18,1) NULL,
+        METERCLOSE      NUMERIC(18,1) NULL,
+        VEHICLEID       INT           NULL
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.DELIVERY_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DELIVERY_DETAILS
+    (
+        DELIVERYID       INT           NOT NULL,
+        DELIVERYNO       VARCHAR(50)   NOT NULL,
+        SALESORDERID     INT           NOT NULL,
+        SALESORDERDETID  INT           NOT NULL,
+        PRODUCTID        INT           NOT NULL,
+        DELIVERYQTY      NUMERIC(12,2) NOT NULL,
+        BALANCEQTY       NUMERIC(12,2) NOT NULL,
+        DRIVERID         INT           NOT NULL,
+        VEHICLENUMBER    VARCHAR(10)   NULL,
+        CREATE_DATE      DATETIME      NOT NULL,
+        CREATE_USER      VARCHAR(50)   NOT NULL,
+        MODIFIED_DATE    DATETIME      NULL,
+        MODIFIED_USER    VARCHAR(50)   NULL
+    );
+END
+GO
+
+------------------------------------------------------------
+-- 11. TRIPENTRY_DETAILS.METERSTART/METERCLOSE precision fix (folded in
+--     from 008_tripentry_meter_precision_fix.sql — see that file's header
+--     for the full story). No-op on a database whose TRIPENTRY_DETAILS
+--     was just created fresh by section 10 above, which already uses the
+--     corrected NUMERIC(18,1).
+------------------------------------------------------------
+IF EXISTS (
+    SELECT 1 FROM sys.columns c
+    INNER JOIN sys.tables t ON t.object_id = c.object_id
+    WHERE t.name = 'TRIPENTRY_DETAILS' AND c.name = 'METERSTART' AND c.scale = 0
+)
+BEGIN
+    ALTER TABLE dbo.TRIPENTRY_DETAILS ALTER COLUMN METERSTART NUMERIC(18,1) NULL;
+    ALTER TABLE dbo.TRIPENTRY_DETAILS ALTER COLUMN METERCLOSE NUMERIC(18,1) NULL;
+END
+GO
+
+------------------------------------------------------------
+-- 12. Product price history prerequisites (folded in from
+--     013_product_price_history.sql — see that file's header for the
+--     full story). PRODUCT_DETAILS.PRODUCTDETAILID was added directly by
+--     hand on db_ams_erp/DB_AMS_ERP_SMS; this makes every other database
+--     match. Section 4's SP_MOBILE_CREATE_SALESORDER above already
+--     stamps SALESORDER_DETAILS.PRODUCTDETAILID with whichever
+--     PRODUCT_DETAILS row is current at the moment of sale.
+------------------------------------------------------------
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'PRODUCT_DETAILS' AND COLUMN_NAME = 'PRODUCTDETAILID'
+)
+BEGIN
+    ALTER TABLE dbo.PRODUCT_DETAILS ADD PRODUCTDETAILID INT IDENTITY(1,1);
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SALESORDER_DETAILS' AND COLUMN_NAME = 'PRODUCTDETAILID'
+)
+BEGIN
+    ALTER TABLE dbo.SALESORDER_DETAILS
+        ADD PRODUCTDETAILID INT NOT NULL CONSTRAINT DF_SALESORDER_DETAILS_PRODUCTDETAILID DEFAULT 0;
+END
+GO
+
