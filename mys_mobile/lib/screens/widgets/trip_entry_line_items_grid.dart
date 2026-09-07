@@ -42,10 +42,11 @@ class TripEntryLineItemsGrid extends StatefulWidget {
 class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
   final Map<TripEntryLine, TextEditingController> _qtyControllers = {};
 
-  // Capped at 2 decimal places — Qty is usually already rounded to 2dp at
-  // the source (see _recomputeQty), but this stays defensive in case a
-  // division ever produces a longer repeating decimal (e.g. 2.3666666...).
-  String _formatQty(double qty) => qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toStringAsFixed(2);
+  // Capped at 1 decimal place — Qty is billed to the nearest tenth of an
+  // hour and is usually already rounded that way at the source (see
+  // _recomputeQty), but this stays defensive in case a division ever
+  // produces a longer repeating decimal (e.g. 2.3666666...).
+  String _formatQty(double qty) => qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toStringAsFixed(1);
 
   TextEditingController _qtyControllerFor(TripEntryLine line) {
     final existing = _qtyControllers[line];

@@ -158,15 +158,17 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
         _recomputeQty(index);
       });
 
-  /// Auto-fills Qty from the Hours (TimeClose - TimeStart, in hours) or
-  /// Meter (MeterClose - MeterStart, entered directly as decimal hours —
-  /// e.g. 120.4 to 122.6 is a 2.2 hour / 2h12m difference) pair once both
+  /// Auto-fills Qty from the Hours (TimeClose - TimeStart) or Meter
+  /// (MeterClose - MeterStart, entered directly as decimal hours — e.g.
+  /// 120.4 to 122.6 is a 2.2 hour / 2h12m difference) pair once both
   /// sides are set — Qty stays directly editable afterward, same as Rate,
-  /// in case the rep needs to override it. Rounded to 2 decimal places —
-  /// both because that's the billing precision this business uses, and
-  /// because dividing minutes by 60 (or subtracting decimal meter
-  /// readings) routinely produces repeating/imprecise doubles like
-  /// 2.3666666666666667 otherwise.
+  /// in case the rep needs to override it. Rounded to the nearest tenth
+  /// of an hour (0.1 = 6 minutes) for both modes — this business bills
+  /// equipment-hours the same way a mechanical hour-meter reads (tenths),
+  /// not to the minute, so e.g. 2h08m (2.1333... true hours) bills as 2.1,
+  /// not 2.13. This also sidesteps the repeating/imprecise doubles that
+  /// dividing minutes by 60 (or subtracting decimal meter readings)
+  /// routinely produces, like 2.3666666666666667.
   void _recomputeQty(int index) {
     final line = _lines[index];
     if (line.meterOrHours == MeterOrHours.hours) {
@@ -174,7 +176,7 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       final close = line.timeClose;
       if (start != null && close != null) {
         final hours = close.difference(start).inMinutes / 60.0;
-        if (hours > 0) line.qty = _roundTo2(hours);
+        if (hours > 0) line.qty = _roundToTenth(hours);
       }
     } else {
       final start = line.meterStart;
@@ -182,12 +184,12 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       if (start != null && close != null && close > start) {
         // Meter readings are decimal hours (0.1 = 6 minutes), so the raw
         // difference is already the billable quantity.
-        line.qty = _roundTo2(close - start);
+        line.qty = _roundToTenth(close - start);
       }
     }
   }
 
-  double _roundTo2(double value) => (value * 100).round() / 100;
+  double _roundToTenth(double value) => (value * 10).round() / 10;
 
   void _onQtyChanged(int index, double newQty) => setState(() => _lines[index].qty = newQty);
 
