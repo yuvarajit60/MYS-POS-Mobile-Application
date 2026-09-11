@@ -7,6 +7,7 @@ import 'create_trip_entry_screen.dart';
 import 'delivery_reports_screen.dart';
 import 'login_screen.dart';
 import 'manage_customers_screen.dart';
+import 'manage_employees_screen.dart';
 import 'manage_products_screen.dart';
 import 'manage_sites_screen.dart';
 import 'manage_vehicle_mappings_screen.dart';
@@ -95,6 +96,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.directions_car_outlined,
           label: 'Vehicle Mapping',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageVehicleMappingsScreen())),
+        ),
+        ActionItem(
+          icon: Icons.badge_outlined,
+          label: 'Employee',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageEmployeesScreen())),
         ),
       ];
 
