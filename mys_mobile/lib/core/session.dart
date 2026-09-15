@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'api_client.dart';
 import 'company_provider.dart';
+import 'current_date_provider.dart';
 import 'secure_storage.dart';
 
 /// In-memory access token + the "am I logged in" state the app boots against.
@@ -58,6 +59,7 @@ class Session extends ChangeNotifier {
     // was cached before (different customer, same device) — drop any
     // stale company so the app bar refetches under the now-current tenant.
     CompanyProvider.instance.reset();
+    CurrentDateProvider.instance.reset();
     notifyListeners();
   }
 
@@ -67,6 +69,7 @@ class Session extends ChangeNotifier {
     isDriver = false;
     await SecureStorage.instance.clear();
     CompanyProvider.instance.reset();
+    CurrentDateProvider.instance.reset();
     notifyListeners();
   }
 }

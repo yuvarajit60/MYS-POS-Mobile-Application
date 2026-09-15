@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/current_date_provider.dart';
 import '../models/customer.dart';
 import '../models/driver.dart';
 import '../models/driver_vehicle.dart';
@@ -49,6 +50,18 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   // Matches the backend's rounding: NETAMOUNT is rounded to the nearest
   // whole rupee, with the difference stored as ROUNDOFF.
   double get _roundedGrandTotal => _grandTotal.roundToDouble();
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await CurrentDateProvider.instance.ensureLoaded();
+    if (!mounted) return;
+    setState(() => _tripDate = CurrentDateProvider.instance.currentDate);
+  }
 
   Future<void> _pickDriver() async {
     final driver = await showSearchPicker<Driver>(

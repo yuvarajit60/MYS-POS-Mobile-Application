@@ -46,6 +46,16 @@
   database is '26-27/'. This is a one-off correction for a mistake, not a
   general prerequisite, so it isn't folded in here.
 
+  Also folds in 016_current_date_entrydate.sql (see that file's header):
+  SP_MOBILE_CREATE_SALESORDER/TRIPENTRY/DELIVERY now read the desktop
+  app's "business date" from dbo.CHANGE_DATE for ENTRYDATE/ENTRYDATE/
+  DELIVERDATE respectively, instead of GETDATE() — CHANGE_DATE and
+  DELIVERY_DETAILS.DELIVERDATE both already existed by hand on
+  db_ams_erp/DB_AMS_ERP_SMS; the guards just before section 4 create and
+  seed them for any other database. Every other date column (TRIPDATE,
+  OrderDate, USERCREATEDDATE, LASTMODIFYEDDATE, CREATE_DATE, ...) is
+  unchanged and still uses GETDATE()/the client-supplied value.
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
@@ -138,6 +148,40 @@ BEGIN
 END
 GO
 
+-- CHANGE_DATE / DELIVERY_DETAILS.DELIVERDATE prerequisites for sections 4,
+-- 5, and 7's procs below (all three now read the business "current date"
+-- from CHANGE_DATE for ENTRYDATE/DELIVERDATE instead of GETDATE() — see
+-- 016_current_date_entrydate.sql's header for the full story). CHANGE_DATE
+-- already existed by hand on db_ams_erp/DB_AMS_ERP_SMS as a legacy
+-- single-row "business date" table the desktop app uses (its ENTRYDATE
+-- can be a day or more behind the wall clock until a "day close" is run);
+-- this creates + seeds it only where it's genuinely missing.
+IF OBJECT_ID(N'dbo.CHANGE_DATE', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CHANGE_DATE
+    (
+        CHANGEDATEID       INT IDENTITY(1,1) NOT NULL,
+        CURRENTDATE        DATETIME NULL,
+        LASTMODIFYEDUSERID INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_LASTMODIFYEDUSERID DEFAULT 0,
+        LASTMODIFYEDDATE   DATETIME NULL,
+        CREATEDEMPLOYEEID  INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_MODIFYEDEMPLOYEEID DEFAULT 0
+    );
+    INSERT INTO dbo.CHANGE_DATE (CURRENTDATE, LASTMODIFYEDUSERID, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID)
+    VALUES (GETDATE(), 0, GETDATE(), 0, 0);
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'DELIVERY_DETAILS' AND COLUMN_NAME = 'DELIVERDATE'
+)
+BEGIN
+    ALTER TABLE dbo.DELIVERY_DETAILS
+        ADD DELIVERDATE DATETIME NOT NULL CONSTRAINT DF_DELIVERY_DETAILS_DELIVERDATE DEFAULT GETDATE();
+END
+GO
+
 ------------------------------------------------------------
 -- 4. Sales-order creation proc (final version)
 --    Writes ONLY to dbo.SALESORDER / dbo.SALESORDER_DETAILS.
@@ -208,6 +252,13 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
+        -- ENTRYDATE uses the desktop app's "business date" (CHANGE_DATE),
+        -- not the wall clock — falls back to GETDATE() if that's somehow
+        -- unset. Every other date column below is untouched.
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
         DECLARE @RawNetAmount NUMERIC(18,2), @RoundedNetAmount NUMERIC(18,2);
 
         SELECT @RawNetAmount = SUM(RATE * QTY)
@@ -224,7 +275,7 @@ BEGIN
              USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
              SHIPPINGADDRESS, CUSTOMERNAME, OrderDate)
         SELECT
-            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
+            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
             SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
             SUM(RATE * QTY), 0, 0, (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
             0, 0, 0, 0, 0, 0, 0, 0,
@@ -357,6 +408,14 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
+        -- ENTRYDATE uses the desktop app's "business date" (CHANGE_DATE),
+        -- not the wall clock — falls back to GETDATE() if that's somehow
+        -- unset. TRIPDATE (client-supplied) and every other date column
+        -- below are untouched.
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
         DECLARE @TripRawNetAmount NUMERIC(18,2), @TripRoundedNetAmount NUMERIC(18,2);
 
         SELECT @TripRawNetAmount = SUM(RATE * QTY)
@@ -373,7 +432,7 @@ BEGIN
              USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
              SITEID, TRIPNO, TRIPDATE, CONVERTTOSALES)
         SELECT
-            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, @EMPLOYEEID, @SITENAME,
+            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, @EMPLOYEEID, @SITENAME,
             SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
             SUM(RATE * QTY), (@TripRoundedNetAmount - @TripRawNetAmount), @TripRoundedNetAmount, 0,
             0, 0, 0, NULL,
@@ -558,6 +617,13 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
+        -- DELIVERDATE uses the desktop app's "business date" (CHANGE_DATE),
+        -- not the wall clock — falls back to GETDATE() if that's somehow
+        -- unset. CREATE_DATE below is untouched.
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
         DECLARE @NextId INT;
         SELECT @NextId = ISNULL(MAX(DELIVERYID), 0) FROM dbo.DELIVERY_DETAILS WITH (TABLOCKX, HOLDLOCK);
 
@@ -567,11 +633,11 @@ BEGIN
         )
         INSERT INTO dbo.DELIVERY_DETAILS
             (DELIVERYID, DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
-             DRIVERID, VEHICLENUMBER, CREATE_DATE, CREATE_USER)
+             DRIVERID, VEHICLENUMBER, DELIVERDATE, CREATE_DATE, CREATE_USER)
         SELECT
             @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
             (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
-            @DRIVERID, @VEHICLENUMBER, GETDATE(), @CREATEUSER
+            @DRIVERID, @VEHICLENUMBER, @CurrentDate, GETDATE(), @CREATEUSER
         FROM Numbered;
 
         UPDATE SOD

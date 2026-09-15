@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import '../core/company_provider.dart';
+import '../core/current_date_provider.dart';
 import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
 import '../models/trip_entry_number.dart';
@@ -38,6 +39,17 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
   @override
   void initState() {
     super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await CurrentDateProvider.instance.ensureLoaded();
+    if (!mounted) return;
+    final currentDate = CurrentDateProvider.instance.currentDate;
+    setState(() {
+      _fromDate = currentDate.subtract(const Duration(days: 30));
+      _toDate = currentDate;
+    });
     // Load with today's date range immediately so the report reflects
     // current data as soon as the screen opens, without an extra tap.
     _generate();

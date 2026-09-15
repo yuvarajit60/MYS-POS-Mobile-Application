@@ -1,0 +1,436 @@
+/*
+  Sales Order, Trip Entry, and Delivery Entry now stamp their ENTRYDATE/
+  DELIVERDATE from the desktop app's "business date" (dbo.CHANGE_DATE —
+  a single-row legacy table) instead of the real wall-clock GETDATE().
+  Confirmed on both real databases on 2026-09-15: CHANGE_DATE already
+  existed with exactly one row each — db_ams_erp's CURRENTDATE was
+  2026-09-14 (a day behind that day's actual date), DB_AMS_ERP_SMS's was
+  2026-05-25 (months behind) — i.e. the desktop app doesn't tie this to
+  the wall clock at all; it advances only when someone runs a "day close"
+  there. Mobile entries need to land on the same business day as desktop
+  ones for reporting/reconciliation to line up, hence this change.
+
+  Only three columns change, exactly as requested:
+    - SALESORDER.ENTRYDATE
+    - TRIPENTRY.ENTRYDATE
+    - DELIVERY_DETAILS.DELIVERDATE (new column — see below)
+  Every other date column (SALESORDER.OrderDate, TRIPENTRY.TRIPDATE —
+  client-supplied, untouched — USERCREATEDDATE, LASTMODIFYEDDATE,
+  DELIVERY_DETAILS.CREATE_DATE, etc.) is unchanged and still uses
+  GETDATE()/its existing value.
+
+  DELIVERY_DETAILS.DELIVERDATE was added directly by hand on db_ams_erp
+  and DB_AMS_ERP_SMS as DATETIME NOT NULL with NO default — meaning
+  SP_MOBILE_CREATE_DELIVERY's INSERT (which didn't previously mention
+  this column at all) would have started hard-failing on both of those
+  databases the moment this column existed, the same class of bug as the
+  DELIVERYNO/DELIVERYQTY gaps found earlier in this project. This script
+  fixes that by adding DELIVERDATE to the INSERT.
+
+  CHANGE_DATE and DELIVERY_DETAILS.DELIVERDATE are both existence-guarded,
+  so this file is safe to run anywhere: on db_ams_erp/DB_AMS_ERP_SMS
+  (which already have both) the guards no-op and only the three procs get
+  replaced; on a database with neither (e.g. a fresh db_ams_pos_test),
+  everything is created and seeded first.
+
+  Folded into deploy_mobile_schema.sql as well — see that file's header.
+  Idempotent — safe to re-run.
+*/
+
+------------------------------------------------------------
+-- 1. Prerequisites
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.CHANGE_DATE', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CHANGE_DATE
+    (
+        CHANGEDATEID       INT IDENTITY(1,1) NOT NULL,
+        CURRENTDATE        DATETIME NULL,
+        LASTMODIFYEDUSERID INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_LASTMODIFYEDUSERID DEFAULT 0,
+        LASTMODIFYEDDATE   DATETIME NULL,
+        CREATEDEMPLOYEEID  INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_CREATEDEMPLOYEEID DEFAULT 0,
+        MODIFYEDEMPLOYEEID INT      NOT NULL CONSTRAINT DF_CHANGE_DATE_MODIFYEDEMPLOYEEID DEFAULT 0
+    );
+    INSERT INTO dbo.CHANGE_DATE (CURRENTDATE, LASTMODIFYEDUSERID, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID)
+    VALUES (GETDATE(), 0, GETDATE(), 0, 0);
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'DELIVERY_DETAILS' AND COLUMN_NAME = 'DELIVERDATE'
+)
+BEGIN
+    ALTER TABLE dbo.DELIVERY_DETAILS
+        ADD DELIVERDATE DATETIME NOT NULL CONSTRAINT DF_DELIVERY_DETAILS_DELIVERDATE DEFAULT GETDATE();
+END
+GO
+
+------------------------------------------------------------
+-- 2. SP_MOBILE_CREATE_SALESORDER — ENTRYDATE now from CHANGE_DATE
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_SALESORDER', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER
+(
+    @LOCATIONID        INT,
+    @CUSTOMERID        INT,
+    @CUSTOMERNAME      VARCHAR(100),
+    @MOBILENO          VARCHAR(50),
+    @SHIPPINGADDRESS   VARCHAR(500),
+    @CREATEDUSERID     INT,
+    @CREATEDEMPLOYEEID INT,
+    @LINES             dbo.TVP_MOBILE_SALESORDER_LINES READONLY,
+    @SALESORDERID      INT           OUTPUT,
+    @ENTRYNO           VARCHAR(MAX)  OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    IF OBJECT_ID('tempdb..#LinePricing') IS NOT NULL DROP TABLE #LinePricing;
+
+    SELECT
+        L.PRODUCTID, L.QTY, L.RATE,
+        PR.MRP, PR.HSNCODE, PR.BRANDID, PR.TYPEID, PR.UOMID,
+        ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
+        ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
+        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE,
+        ISNULL(PD.PRODUCTDETAILID, 0) AS PRODUCTDETAILID
+    INTO #LinePricing
+    FROM @LINES L
+    INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID
+    OUTER APPLY (
+        SELECT TOP 1 PDI.PRODUCTDETAILID
+        FROM dbo.PRODUCT_DETAILS PDI
+        WHERE PDI.PRODUCTID = L.PRODUCTID AND PDI.VALID_END_DATE IS NULL AND PDI.VALID = 1
+        ORDER BY PDI.PRODUCTDETAILID DESC
+    ) PD;
+
+    IF (SELECT COUNT(*) FROM #LinePricing) <> (SELECT COUNT(*) FROM @LINES)
+    BEGIN
+        RAISERROR('One or more products no longer exist.', 16, 1);
+        DROP TABLE #LinePricing;
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'SALESORDER',
+             @TRANNO = @ENTRYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
+        DECLARE @RawNetAmount NUMERIC(18,2), @RoundedNetAmount NUMERIC(18,2);
+
+        SELECT @RawNetAmount = SUM(RATE * QTY)
+                              + SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2))
+        FROM #LinePricing;
+
+        SET @RoundedNetAmount = ROUND(@RawNetAmount, 0);
+
+        INSERT INTO dbo.SALESORDER
+            (ENTRYNO, ENTRYDATE, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID, PAYMENTMODE,
+             TAXABLEVALUE, TOTALTAX, ITEMVALUE, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, ROUNDOFF, NETAMOUNT,
+             SELECTRATE, CASHAMOUNT, CARDAMOUNT, RECEIVEDAMOUNT, REFUNDAMOUNT, SETTLEMENT, SETTLEMENTID, PAYMENT,
+             CANCELUSERID, CANCELID, CANCEL, CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
+             USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
+             SHIPPINGADDRESS, CUSTOMERNAME, OrderDate)
+        SELECT
+            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
+            SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            SUM(RATE * QTY), 0, 0, (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
+            GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
+            @SHIPPINGADDRESS, @CUSTOMERNAME, CAST(GETDATE() AS DATE)
+        FROM #LinePricing;
+
+        SET @SALESORDERID = SCOPE_IDENTITY();
+
+        INSERT INTO dbo.SALESORDER_DETAILS
+            (SALESORDERID, COMPANYID, COUNTERID, BARCODE, PRODUCTID, PRODUCTCODE, HSNCODE, BRANDID, TYPEID, UOMID,
+             WEIGHT, QTY, MRP, RATE, GROSSAMOUNT, DISCOUNTPERCENTAGE, DISCOUNTAMOUNT, OTHERDISCOUNTAMOUNT,
+             TAXABLEVALUE, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT,
+             TOTALTAX, PERRATE, PRATE, PTAX, TOTALAMOUNT, STOCKQTY, MFGDATE, EXPDATE, ENTRYID,
+             PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY, PRODUCTDETAILID)
+        SELECT
+            @SALESORDERID, 1, 0, '', PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
+            0, QTY, MRP, RATE, RATE * QTY, 0, 0, 0,
+            RATE * QTY,
+            SALESCGSTPERCENTAGE, ROUND(RATE * QTY * SALESCGSTPERCENTAGE / 100.0, 2),
+            SALESSGSTPERCENTAGE, ROUND(RATE * QTY * SALESSGSTPERCENTAGE / 100.0, 2),
+            SALESIGSTPERCENTAGE, ROUND(RATE * QTY * SALESIGSTPERCENTAGE / 100.0, 2),
+            ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            RATE, 0, 0,
+            RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            0, NULL, NULL, 0,
+            0, 0, 0, QTY, PRODUCTDETAILID
+        FROM #LinePricing;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #LinePricing;
+        THROW;
+    END CATCH
+
+    DROP TABLE #LinePricing;
+END
+GO
+
+------------------------------------------------------------
+-- 3. SP_MOBILE_CREATE_TRIPENTRY — ENTRYDATE now from CHANGE_DATE
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_TRIPENTRY', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_TRIPENTRY;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_TRIPENTRY
+(
+    @LOCATIONID        INT,
+    @CUSTOMERID        INT,
+    @MOBILENO          VARCHAR(50),
+    @SITEID            INT,
+    @EMPLOYEEID        INT,           -- driver
+    @TRIPNO            NVARCHAR(100),
+    @TRIPDATE          DATETIME,
+    @CREATEDUSERID     INT,
+    @CREATEDEMPLOYEEID INT,
+    @LINES             dbo.TVP_MOBILE_TRIPENTRY_LINES READONLY,
+    @TRIPENTRYID       INT           OUTPUT,
+    @ENTRYNO           VARCHAR(MAX)  OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    DECLARE @SITENAME VARCHAR(100);
+    SELECT @SITENAME = SITENAME FROM dbo.SITE WHERE SITEID = @SITEID AND STATUS = 1;
+    IF @SITENAME IS NULL
+    BEGIN
+        RAISERROR('Site not found.', 16, 1);
+        RETURN;
+    END
+
+    IF OBJECT_ID('tempdb..#LinePricing') IS NOT NULL DROP TABLE #LinePricing;
+
+    SELECT
+        L.PRODUCTID, L.METERORHOURSID, L.TIMESTART, L.TIMECLOSE, L.METERSTART, L.METERCLOSE,
+        L.VEHICLEID, L.QTY, L.RATE,
+        PR.MRP, PR.HSNCODE, PR.BRANDID, PR.TYPEID, PR.UOMID,
+        ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
+        ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
+        ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE
+    INTO #LinePricing
+    FROM @LINES L
+    INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID;
+
+    IF (SELECT COUNT(*) FROM #LinePricing) <> (SELECT COUNT(*) FROM @LINES)
+    BEGIN
+        RAISERROR('One or more products no longer exist.', 16, 1);
+        DROP TABLE #LinePricing;
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'TRIPENTRY',
+             @TRANNO = @ENTRYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
+        DECLARE @TripRawNetAmount NUMERIC(18,2), @TripRoundedNetAmount NUMERIC(18,2);
+
+        SELECT @TripRawNetAmount = SUM(RATE * QTY)
+                                   + SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2))
+        FROM #LinePricing;
+
+        SET @TripRoundedNetAmount = ROUND(@TripRawNetAmount, 0);
+
+        INSERT INTO dbo.TRIPENTRY
+            (ENTRYNO, ENTRYDATE, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID, EMPLOYEEID, SITENAME,
+             TAXABLEVALUE, TOTALTAX, ITEMVALUE, ROUNDOFF, NETAMOUNT, SELECTRATE,
+             CANCELUSERID, CANCELID, CANCEL, CANCELDATETIME,
+             CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
+             USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
+             SITEID, TRIPNO, TRIPDATE, CONVERTTOSALES)
+        SELECT
+            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, @EMPLOYEEID, @SITENAME,
+            SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            SUM(RATE * QTY), (@TripRoundedNetAmount - @TripRawNetAmount), @TripRoundedNetAmount, 0,
+            0, 0, 0, NULL,
+            @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
+            GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
+            @SITEID, @TRIPNO, @TRIPDATE, 0
+        FROM #LinePricing;
+
+        SET @TRIPENTRYID = SCOPE_IDENTITY();
+
+        INSERT INTO dbo.TRIPENTRY_DETAILS
+            (TRIPENTRYID, COMPANYID, COUNTERID, PRODUCTID, PRODUCTCODE, HSNCODE, BRANDID, TYPEID, UOMID,
+             WEIGHT, QTY, MRP, RATE, GROSSAMOUNT,
+             TAXABLEVALUE, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT,
+             TOTALTAX, PERRATE, PRATE, TOTALAMOUNT, ENTRYID,
+             METERORHOURSID, TIMESTART, TIMECLOSE, METERSTART, METERCLOSE, VEHICLEID)
+        SELECT
+            @TRIPENTRYID, 1, 0, PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
+            0, QTY, MRP, RATE, RATE * QTY,
+            RATE * QTY,
+            SALESCGSTPERCENTAGE, ROUND(RATE * QTY * SALESCGSTPERCENTAGE / 100.0, 2),
+            SALESSGSTPERCENTAGE, ROUND(RATE * QTY * SALESSGSTPERCENTAGE / 100.0, 2),
+            SALESIGSTPERCENTAGE, ROUND(RATE * QTY * SALESIGSTPERCENTAGE / 100.0, 2),
+            ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            RATE, 0,
+            RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            0,
+            METERORHOURSID, TIMESTART, TIMECLOSE, METERSTART, METERCLOSE, VEHICLEID
+        FROM #LinePricing;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #LinePricing;
+        THROW;
+    END CATCH
+
+    DROP TABLE #LinePricing;
+END
+GO
+
+------------------------------------------------------------
+-- 4. SP_MOBILE_CREATE_DELIVERY — DELIVERDATE now from CHANGE_DATE
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_DELIVERY', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY
+(
+    @LOCATIONID    INT,
+    @DRIVERID      INT,
+    @VEHICLENUMBER VARCHAR(50),
+    @CREATEUSER    VARCHAR(50),
+    @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY,
+    @DELIVERYNO    VARCHAR(MAX) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM @LINES)
+    BEGIN
+        RAISERROR('At least one line item is required.', 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        IF OBJECT_ID('tempdb..#DeliveryLines') IS NOT NULL DROP TABLE #DeliveryLines;
+
+        SELECT
+            L.SALESORDERDETID, L.SALESORDERID, L.PRODUCTID, L.DELIVERYQTY AS CURRENTDELIVERY,
+            SOD.SALESQTY, SOD.DELIVERYQTY AS ALREADYDELIVERED
+        INTO #DeliveryLines
+        FROM @LINES L
+        INNER JOIN dbo.SALESORDER_DETAILS SOD WITH (UPDLOCK, HOLDLOCK) ON SOD.SALESORDERDETID = L.SALESORDERDETID
+        INNER JOIN dbo.SALESORDER SO ON SO.SALESORDERID = SOD.SALESORDERID
+        WHERE SO.LOCATIONID = @LOCATIONID AND SO.CANCEL = 0;
+
+        IF (SELECT COUNT(*) FROM #DeliveryLines) <> (SELECT COUNT(*) FROM @LINES)
+        BEGIN
+            RAISERROR('One or more sales order lines no longer exist or belong to a different location.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        IF EXISTS (SELECT 1 FROM #DeliveryLines WHERE CURRENTDELIVERY <= 0)
+        BEGIN
+            RAISERROR('Delivery quantity must be greater than zero.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        IF EXISTS (SELECT 1 FROM #DeliveryLines WHERE CURRENTDELIVERY > (SALESQTY - ALREADYDELIVERED))
+        BEGIN
+            RAISERROR('One or more lines exceed their remaining balance quantity - someone may have already delivered part of this order. Refresh and try again.', 16, 1);
+            DROP TABLE #DeliveryLines;
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        EXEC dbo.SP_GENERATETRANNO
+             @TRANSACTIONNAME = 'DELIVERY',
+             @TRANNO = @DELIVERYNO OUTPUT,
+             @USERSHORTNAME = '',
+             @LOCATIONID = @LOCATIONID;
+
+        DECLARE @CurrentDate DATETIME;
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
+        DECLARE @NextId INT;
+        SELECT @NextId = ISNULL(MAX(DELIVERYID), 0) FROM dbo.DELIVERY_DETAILS WITH (TABLOCKX, HOLDLOCK);
+
+        ;WITH Numbered AS (
+            SELECT *, ROW_NUMBER() OVER (ORDER BY SALESORDERDETID) AS RN
+            FROM #DeliveryLines
+        )
+        INSERT INTO dbo.DELIVERY_DETAILS
+            (DELIVERYID, DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
+             DRIVERID, VEHICLENUMBER, DELIVERDATE, CREATE_DATE, CREATE_USER)
+        SELECT
+            @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
+            (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
+            @DRIVERID, @VEHICLENUMBER, @CurrentDate, GETDATE(), @CREATEUSER
+        FROM Numbered;
+
+        UPDATE SOD
+        SET SOD.DELIVERYQTY = SOD.DELIVERYQTY + DL.CURRENTDELIVERY
+        FROM dbo.SALESORDER_DETAILS SOD
+        INNER JOIN #DeliveryLines DL ON DL.SALESORDERDETID = SOD.SALESORDERDETID;
+
+        DROP TABLE #DeliveryLines;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        DROP TABLE IF EXISTS #DeliveryLines;
+        THROW;
+    END CATCH
+END
+GO
