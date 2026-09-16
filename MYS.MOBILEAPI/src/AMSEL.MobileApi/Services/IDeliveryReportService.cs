@@ -34,7 +34,7 @@ public class DeliveryReportService : IDeliveryReportService
         var like = $"%{deliveryNo}%";
         var rows = await connection.QueryAsync<DeliverySummaryDto>(
             """
-            SELECT DD.DELIVERYNO AS DeliveryNo, MIN(DD.CREATE_DATE) AS DeliveryDate,
+            SELECT DD.DELIVERYNO AS DeliveryNo, MIN(DD.DELIVERDATE) AS DeliveryDate,
                    MAX(C.CUSTOMERNAME) AS CustomerName, MAX(ISNULL(E.EMPLOYEENAME, '')) AS DriverName,
                    MAX(DD.VEHICLENUMBER) AS VehicleNumber, SUM(DD.DELIVERYQTY) AS TotalQty, COUNT(*) AS LineCount
             FROM DELIVERY_DETAILS DD
@@ -42,11 +42,11 @@ public class DeliveryReportService : IDeliveryReportService
             INNER JOIN CUSTOMER C ON C.CUSTOMERID = SO.CUSTOMERID
             LEFT JOIN EMPLOYEE E ON E.EMPLOYEEID = DD.DRIVERID
             WHERE SO.LOCATIONID = @LocationId
-              AND CAST(DD.CREATE_DATE AS DATE) BETWEEN @FromDate AND @ToDate
+              AND CAST(DD.DELIVERDATE AS DATE) BETWEEN @FromDate AND @ToDate
               AND (@CustomerId IS NULL OR SO.CUSTOMERID = @CustomerId)
               AND (@DeliveryNo IS NULL OR DD.DELIVERYNO LIKE @Like)
             GROUP BY DD.DELIVERYNO
-            ORDER BY MIN(DD.CREATE_DATE) DESC
+            ORDER BY MIN(DD.DELIVERDATE) DESC
             """,
             new
             {
@@ -69,7 +69,7 @@ public class DeliveryReportService : IDeliveryReportService
 
         var header = await connection.QueryFirstOrDefaultAsync<DeliveryHeaderRow>(
             """
-            SELECT TOP 1 DD.DELIVERYNO AS DeliveryNo, DD.CREATE_DATE AS DeliveryDate, C.CUSTOMERNAME AS CustomerName,
+            SELECT TOP 1 DD.DELIVERYNO AS DeliveryNo, DD.DELIVERDATE AS DeliveryDate, C.CUSTOMERNAME AS CustomerName,
                    ISNULL(E.EMPLOYEENAME, '') AS DriverName, DD.VEHICLENUMBER AS VehicleNumber
             FROM DELIVERY_DETAILS DD
             INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
