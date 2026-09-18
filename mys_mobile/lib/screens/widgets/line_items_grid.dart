@@ -9,12 +9,17 @@ import '../../models/sales_order_line.dart';
 /// product's own GST%, so both fields need their own controller here (a
 /// plain `initialValue` only seeds a field once and wouldn't reflect the
 /// other field's edits). TotalAmount shown is tax-inclusive (rate x qty,
-/// plus CGST + SGST).
+/// plus CGST + SGST). The Discount checkbox swaps the Rate field for a
+/// Discount Amount field (Rate keeps tracking MRP underneath, just isn't
+/// rep-editable while a discount is active) — see SalesOrderLine for the
+/// calculation.
 class LineItemsGrid extends StatefulWidget {
   final List<SalesOrderLine> lines;
   final void Function(int index, double newQty) onQtyChanged;
   final void Function(int index, double newMrp) onMrpChanged;
   final void Function(int index, double newRate) onRateChanged;
+  final void Function(int index, bool enabled) onDiscountToggled;
+  final void Function(int index, double newDiscount) onDiscountChanged;
   final void Function(int index) onDelete;
 
   const LineItemsGrid({
@@ -23,6 +28,8 @@ class LineItemsGrid extends StatefulWidget {
     required this.onQtyChanged,
     required this.onMrpChanged,
     required this.onRateChanged,
+    required this.onDiscountToggled,
+    required this.onDiscountChanged,
     required this.onDelete,
   });
 
@@ -33,6 +40,7 @@ class LineItemsGrid extends StatefulWidget {
 class _LineItemsGridState extends State<LineItemsGrid> {
   final Map<SalesOrderLine, TextEditingController> _mrpControllers = {};
   final Map<SalesOrderLine, TextEditingController> _rateControllers = {};
+  final Map<SalesOrderLine, TextEditingController> _discountControllers = {};
 
   String _formatMoney(double value) => value.toStringAsFixed(2);
 
@@ -57,6 +65,7 @@ class _LineItemsGridState extends State<LineItemsGrid> {
     for (final line in removed) {
       _mrpControllers.remove(line)?.dispose();
       _rateControllers.remove(line)?.dispose();
+      _discountControllers.remove(line)?.dispose();
     }
   }
 
@@ -73,6 +82,9 @@ class _LineItemsGridState extends State<LineItemsGrid> {
       controller.dispose();
     }
     for (final controller in _rateControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _discountControllers.values) {
       controller.dispose();
     }
     super.dispose();
@@ -104,6 +116,16 @@ class _LineItemsGridState extends State<LineItemsGrid> {
                   Expanded(
                     child: Text(line.product.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Checkbox(
+                        value: line.discountEnabled,
+                        onChanged: (checked) => widget.onDiscountToggled(index, checked ?? false),
+                      ),
+                      const Text('Discount', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => widget.onDelete(index),
@@ -125,18 +147,32 @@ class _LineItemsGridState extends State<LineItemsGrid> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SizedBox(
-                    width: 90,
-                    child: TextFormField(
-                      controller: _controllerFor(_rateControllers, line, (l) => l.rate),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(isDense: true, labelText: 'Rate'),
-                      onChanged: (value) {
-                        final parsed = double.tryParse(value);
-                        if (parsed != null && parsed >= 0) widget.onRateChanged(index, parsed);
-                      },
+                  if (!line.discountEnabled)
+                    SizedBox(
+                      width: 90,
+                      child: TextFormField(
+                        controller: _controllerFor(_rateControllers, line, (l) => l.rate),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(isDense: true, labelText: 'Rate'),
+                        onChanged: (value) {
+                          final parsed = double.tryParse(value);
+                          if (parsed != null && parsed >= 0) widget.onRateChanged(index, parsed);
+                        },
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: 90,
+                      child: TextFormField(
+                        controller: _controllerFor(_discountControllers, line, (l) => l.discountAmount),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(isDense: true, labelText: 'Discount'),
+                        onChanged: (value) {
+                          final parsed = double.tryParse(value);
+                          if (parsed != null && parsed >= 0) widget.onDiscountChanged(index, parsed);
+                        },
+                      ),
                     ),
-                  ),
                   const SizedBox(width: 12),
                   SizedBox(
                     width: 70,

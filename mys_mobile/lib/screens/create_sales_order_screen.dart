@@ -129,6 +129,14 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
     setState(() => _lines[index].updateFromRate(newRate));
   }
 
+  void _onDiscountToggled(int index, bool enabled) {
+    setState(() => _lines[index].setDiscountEnabled(enabled));
+  }
+
+  void _onDiscountChanged(int index, double newDiscount) {
+    setState(() => _lines[index].updateFromDiscount(newDiscount));
+  }
+
   void _onDeleteLine(int index) {
     setState(() => _lines.removeAt(index));
   }
@@ -217,6 +225,8 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
               onQtyChanged: _onQtyChanged,
               onMrpChanged: _onMrpChanged,
               onRateChanged: _onRateChanged,
+              onDiscountToggled: _onDiscountToggled,
+              onDiscountChanged: _onDiscountChanged,
               onDelete: _onDeleteLine,
             ),
             const Divider(),

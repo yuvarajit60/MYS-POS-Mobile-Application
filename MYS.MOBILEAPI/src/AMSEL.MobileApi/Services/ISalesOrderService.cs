@@ -34,8 +34,9 @@ public class SalesOrderService : ISalesOrderService
         linesTable.Columns.Add("PRODUCTID", typeof(int));
         linesTable.Columns.Add("QTY", typeof(decimal));
         linesTable.Columns.Add("RATE", typeof(decimal));
+        linesTable.Columns.Add("DISCOUNTAMOUNT", typeof(decimal));
         foreach (var line in request.Lines)
-            linesTable.Rows.Add(line.ProductId, line.Qty, line.Rate);
+            linesTable.Rows.Add(line.ProductId, line.Qty, line.Rate, line.DiscountAmount);
 
         using var connection = _connectionFactory.CreateConnection();
         await connection.OpenAsync();

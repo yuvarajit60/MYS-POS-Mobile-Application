@@ -28,7 +28,14 @@ class SalesOrderService {
         'mobileNo': customer.mobileNo,
         'shippingAddress': shippingAddress,
         'siteId': ?siteId,
-        'lines': lines.map((l) => {'productId': l.product.productId, 'qty': l.qty, 'rate': l.rate}).toList(),
+        'lines': lines
+            .map((l) => {
+                  'productId': l.product.productId,
+                  'qty': l.qty,
+                  'rate': l.rate,
+                  'discountAmount': l.discountEnabled ? l.discountAmount : 0,
+                })
+            .toList(),
       });
       final data = response.data as Map<String, dynamic>;
       return SalesOrderResult(salesOrderId: data['salesOrderId'] as int, entryNo: data['entryNo'] as String);

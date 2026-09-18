@@ -73,6 +73,15 @@
   SP_MOBILE_CREATE_DELIVERY, backing a Site picker on Delivery Entry
   scoped to the selected customer, same as Sales Order's.
 
+  Also folds in 020_salesorder_discount.sql (see that file's header):
+  dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
+  flat, tax-exclusive, per-line amount from the Sales Order screen's new
+  Discount checkbox) and SP_MOBILE_CREATE_SALESORDER now computes tax on
+  the post-discount amount instead of the raw RATE*QTY. Table-valued
+  parameter TYPEs can't be ALTERed, only dropped and recreated — section 1
+  above already does that unconditionally on every run, so no separate
+  guard is needed here the way a plain table column would need one.
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
@@ -97,9 +106,10 @@ GO
 
 CREATE TYPE dbo.TVP_MOBILE_SALESORDER_LINES AS TABLE
 (
-    PRODUCTID INT           NOT NULL,
-    QTY       NUMERIC(18,3) NOT NULL,
-    RATE      NUMERIC(18,2) NOT NULL   -- rep-editable, defaults to PRODUCT.MRP client-side
+    PRODUCTID       INT           NOT NULL,
+    QTY             NUMERIC(18,3) NOT NULL,
+    RATE            NUMERIC(18,2) NOT NULL,  -- rep-editable, defaults to PRODUCT.MRP client-side
+    DISCOUNTAMOUNT  NUMERIC(18,2) NOT NULL   -- flat, tax-exclusive; 0 when the line's Discount checkbox is off
 );
 GO
 
@@ -220,6 +230,13 @@ GO
 --    Never touches dbo.STOCK_DETAILS or dbo.SALES / dbo.SALES_DETAILS.
 --    Prices off dbo.PRODUCT (MRP, tax %) — RATE is rep-editable and
 --    trusted from the client; tax % is always re-derived server-side.
+--    DISCOUNTAMOUNT is a flat, tax-exclusive, per-line amount (the
+--    mobile app's Discount checkbox) subtracted from RATE*QTY before
+--    tax — LINETAXABLE clamps at 0 so a discount can never make a line
+--    negative. GROSSAMOUNT (RATE*QTY, pre-discount) is still stored on
+--    SALESORDER_DETAILS alongside the applied DISCOUNTAMOUNT and the
+--    resulting (post-discount) TAXABLEVALUE, same relationship at the
+--    SALESORDER header level (ITEMVALUE = gross, TAXABLEVALUE = net).
 ------------------------------------------------------------
 CREATE PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER
 (
@@ -249,12 +266,13 @@ BEGIN
     IF OBJECT_ID('tempdb..#LinePricing') IS NOT NULL DROP TABLE #LinePricing;
 
     SELECT
-        L.PRODUCTID, L.QTY, L.RATE,
+        L.PRODUCTID, L.QTY, L.RATE, L.DISCOUNTAMOUNT,
         PR.MRP, PR.HSNCODE, PR.BRANDID, PR.TYPEID, PR.UOMID,
         ISNULL(PR.SALESCGSTPERCENTAGE, 0) AS SALESCGSTPERCENTAGE,
         ISNULL(PR.SALESSGSTPERCENTAGE, 0) AS SALESSGSTPERCENTAGE,
         ISNULL(PR.SALESIGSTPERCENTAGE, 0) AS SALESIGSTPERCENTAGE,
-        ISNULL(PD.PRODUCTDETAILID, 0) AS PRODUCTDETAILID
+        ISNULL(PD.PRODUCTDETAILID, 0) AS PRODUCTDETAILID,
+        CASE WHEN (L.RATE * L.QTY - L.DISCOUNTAMOUNT) < 0 THEN 0 ELSE (L.RATE * L.QTY - L.DISCOUNTAMOUNT) END AS LINETAXABLE
     INTO #LinePricing
     FROM @LINES L
     INNER JOIN dbo.PRODUCT PR ON PR.PRODUCTID = L.PRODUCTID
@@ -294,8 +312,8 @@ BEGIN
 
         DECLARE @RawNetAmount NUMERIC(18,2), @RoundedNetAmount NUMERIC(18,2);
 
-        SELECT @RawNetAmount = SUM(RATE * QTY)
-                              + SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2))
+        SELECT @RawNetAmount = SUM(LINETAXABLE)
+                              + SUM(ROUND(LINETAXABLE * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2))
         FROM #LinePricing;
 
         SET @RoundedNetAmount = ROUND(@RawNetAmount, 0);
@@ -309,8 +327,8 @@ BEGIN
              SHIPPINGADDRESS, CUSTOMERNAME, OrderDate, SITEID)
         SELECT
             @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
-            SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
-            SUM(RATE * QTY), 0, 0, (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
+            SUM(LINETAXABLE), SUM(ROUND(LINETAXABLE * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
+            SUM(RATE * QTY), 0, SUM(RATE * QTY - LINETAXABLE), (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
             0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
             GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
@@ -327,14 +345,14 @@ BEGIN
              PERPOINTS, SALESPOINTS, FREEITEM, SALESQTY, PRODUCTDETAILID)
         SELECT
             @SALESORDERID, 1, 0, '', PRODUCTID, '', HSNCODE, BRANDID, TYPEID, UOMID,
-            0, QTY, MRP, RATE, RATE * QTY, 0, 0, 0,
-            RATE * QTY,
-            SALESCGSTPERCENTAGE, ROUND(RATE * QTY * SALESCGSTPERCENTAGE / 100.0, 2),
-            SALESSGSTPERCENTAGE, ROUND(RATE * QTY * SALESSGSTPERCENTAGE / 100.0, 2),
-            SALESIGSTPERCENTAGE, ROUND(RATE * QTY * SALESIGSTPERCENTAGE / 100.0, 2),
-            ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            0, QTY, MRP, RATE, RATE * QTY, 0, (RATE * QTY - LINETAXABLE), 0,
+            LINETAXABLE,
+            SALESCGSTPERCENTAGE, ROUND(LINETAXABLE * SALESCGSTPERCENTAGE / 100.0, 2),
+            SALESSGSTPERCENTAGE, ROUND(LINETAXABLE * SALESSGSTPERCENTAGE / 100.0, 2),
+            SALESIGSTPERCENTAGE, ROUND(LINETAXABLE * SALESIGSTPERCENTAGE / 100.0, 2),
+            ROUND(LINETAXABLE * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
             RATE, 0, 0,
-            RATE * QTY + ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
+            LINETAXABLE + ROUND(LINETAXABLE * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2),
             0, NULL, NULL, 0,
             0, 0, 0, QTY, PRODUCTDETAILID
         FROM #LinePricing;

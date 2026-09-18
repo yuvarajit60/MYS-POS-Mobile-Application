@@ -1,6 +1,6 @@
 namespace AMSEL.MobileApi.Data.Dto;
 
-public record SalesOrderLineRequest(int ProductId, decimal Qty, decimal Rate);
+public record SalesOrderLineRequest(int ProductId, decimal Qty, decimal Rate, decimal DiscountAmount = 0);
 
 public record CreateSalesOrderRequest(
     int CustomerId,
