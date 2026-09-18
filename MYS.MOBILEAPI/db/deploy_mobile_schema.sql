@@ -62,6 +62,12 @@
   customer ledger report (Delivery/Payment rows with a running Outstanding
   Amount, derived — not stored — from DELIVERY_DETAILS + PAYMENT_DETAILS).
 
+  Also folds in 018_salesorder_siteid.sql (see that file's header):
+  SALESORDER.SITEID (new column, mirrors TRIPENTRY.SITEID) is now saved
+  by SP_MOBILE_CREATE_SALESORDER alongside the existing SHIPPINGADDRESS
+  text snapshot, so the Sales Order screen's site picker has a real
+  reference back to dbo.SITE, not just free text.
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
@@ -188,6 +194,21 @@ BEGIN
 END
 GO
 
+-- SALESORDER.SITEID (folded in from 018_salesorder_siteid.sql — see that
+-- file's header) must exist before SP_MOBILE_CREATE_SALESORDER's CREATE
+-- PROCEDURE below, same deferred-name-resolution reason as every other
+-- prerequisite guard in this section: a column reference on an existing
+-- table is validated immediately, not deferred, at CREATE PROCEDURE time.
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SALESORDER' AND COLUMN_NAME = 'SITEID'
+)
+BEGIN
+    ALTER TABLE dbo.SALESORDER
+        ADD SITEID INT NOT NULL CONSTRAINT DF_SALESORDER_SITEID DEFAULT 0;
+END
+GO
+
 ------------------------------------------------------------
 -- 4. Sales-order creation proc (final version)
 --    Writes ONLY to dbo.SALESORDER / dbo.SALESORDER_DETAILS.
@@ -202,6 +223,7 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_SALESORDER
     @CUSTOMERNAME      VARCHAR(100),
     @MOBILENO          VARCHAR(50),
     @SHIPPINGADDRESS   VARCHAR(500),
+    @SITEID            INT = 0,
     @CREATEDUSERID     INT,
     @CREATEDEMPLOYEEID INT,
     @LINES             dbo.TVP_MOBILE_SALESORDER_LINES READONLY,
@@ -279,7 +301,7 @@ BEGIN
              SELECTRATE, CASHAMOUNT, CARDAMOUNT, RECEIVEDAMOUNT, REFUNDAMOUNT, SETTLEMENT, SETTLEMENTID, PAYMENT,
              CANCELUSERID, CANCELID, CANCEL, CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
              USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
-             SHIPPINGADDRESS, CUSTOMERNAME, OrderDate)
+             SHIPPINGADDRESS, CUSTOMERNAME, OrderDate, SITEID)
         SELECT
             @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
             SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
@@ -287,7 +309,7 @@ BEGIN
             0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, @LOCATIONID, @LOCATIONID, @CREATEDUSERID, @CREATEDUSERID,
             GETDATE(), GETDATE(), @CREATEDEMPLOYEEID, @CREATEDEMPLOYEEID,
-            @SHIPPINGADDRESS, @CUSTOMERNAME, CAST(GETDATE() AS DATE)
+            @SHIPPINGADDRESS, @CUSTOMERNAME, CAST(GETDATE() AS DATE), @SITEID
         FROM #LinePricing;
 
         SET @SALESORDERID = SCOPE_IDENTITY();

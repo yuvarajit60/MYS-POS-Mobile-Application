@@ -49,6 +49,7 @@ public class SalesOrderService : ISalesOrderService
         command.Parameters.Add(new SqlParameter("@CUSTOMERNAME", SqlDbType.VarChar, 100) { Value = request.CustomerName });
         command.Parameters.Add(new SqlParameter("@MOBILENO", SqlDbType.VarChar, 50) { Value = request.MobileNo });
         command.Parameters.Add(new SqlParameter("@SHIPPINGADDRESS", SqlDbType.VarChar, 500) { Value = request.ShippingAddress });
+        command.Parameters.Add(new SqlParameter("@SITEID", SqlDbType.Int) { Value = request.SiteId ?? 0 });
         command.Parameters.Add(new SqlParameter("@CREATEDUSERID", SqlDbType.Int) { Value = userId });
         command.Parameters.Add(new SqlParameter("@CREATEDEMPLOYEEID", SqlDbType.Int) { Value = employeeId });
 

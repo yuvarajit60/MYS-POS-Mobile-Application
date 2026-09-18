@@ -149,6 +149,7 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
       final result = await _salesOrderService.create(
         customer: _selectedCustomer!,
         shippingAddress: site == null ? '' : '${site.siteName}, ${site.areaName}',
+        siteId: site?.siteId,
         lines: _lines,
       );
       if (!mounted) return;

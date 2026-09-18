@@ -7,6 +7,7 @@ public record CreateSalesOrderRequest(
     string CustomerName,
     string MobileNo,
     string ShippingAddress,
+    int? SiteId,
     List<SalesOrderLineRequest> Lines);
 
 public record CreateSalesOrderResponse(int SalesOrderId, string EntryNo);

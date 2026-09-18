@@ -18,6 +18,7 @@ class SalesOrderService {
   Future<SalesOrderResult> create({
     required Customer customer,
     required String shippingAddress,
+    int? siteId,
     required List<SalesOrderLine> lines,
   }) async {
     try {
@@ -26,6 +27,7 @@ class SalesOrderService {
         'customerName': customer.customerName,
         'mobileNo': customer.mobileNo,
         'shippingAddress': shippingAddress,
+        'siteId': ?siteId,
         'lines': lines.map((l) => {'productId': l.product.productId, 'qty': l.qty, 'rate': l.rate}).toList(),
       });
       final data = response.data as Map<String, dynamic>;
