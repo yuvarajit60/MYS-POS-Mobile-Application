@@ -3,12 +3,14 @@ import '../models/customer.dart';
 import '../models/product.dart';
 import '../models/sales_order_line.dart';
 import '../models/site.dart';
+import '../models/site_detail.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
 import '../services/sales_order_service.dart';
 import '../services/site_service.dart';
 import 'customer_form_screen.dart';
 import 'product_form_screen.dart';
+import 'site_form_screen.dart';
 import 'widgets/line_items_grid.dart';
 import 'widgets/search_picker_sheet.dart';
 
@@ -67,6 +69,21 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
       search: (query) => _siteService.search(query, customerId: _selectedCustomer!.customerId),
       itemLabel: (s) => s.siteName,
       itemSubtitle: (s) => s.areaName,
+      addNewLabel: 'Add New Site',
+      onAddNew: (context) async {
+        final detail = await Navigator.of(context).push<SiteDetail>(
+          MaterialPageRoute(builder: (_) => SiteFormScreen(initialCustomer: _selectedCustomer)),
+        );
+        if (detail == null) return null;
+        return Site(
+          siteId: detail.siteId,
+          siteName: detail.siteName,
+          areaName: detail.areaName,
+          customerId: detail.customerId,
+          customerName: detail.customerName,
+          mobileNo: _selectedCustomer!.mobileNo,
+        );
+      },
     );
     if (site != null) setState(() => _selectedSite = site);
   }

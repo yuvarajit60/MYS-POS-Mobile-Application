@@ -11,7 +11,8 @@ import 'widgets/search_picker_sheet.dart';
 /// customer it belongs to. Mirrors CustomerFormScreen's structure.
 class SiteFormScreen extends StatefulWidget {
   final SiteDetail? editing;
-  const SiteFormScreen({super.key, this.editing});
+  final Customer? initialCustomer;
+  const SiteFormScreen({super.key, this.editing, this.initialCustomer});
 
   @override
   State<SiteFormScreen> createState() => _SiteFormScreenState();
@@ -39,6 +40,8 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
     if (editing != null) {
       _selectedCustomer = Customer(customerId: editing.customerId, customerName: editing.customerName, mobileNo: '');
       _selectedCity = City(cityId: editing.cityId, cityName: editing.cityName);
+    } else if (widget.initialCustomer != null) {
+      _selectedCustomer = widget.initialCustomer;
     }
   }
 
