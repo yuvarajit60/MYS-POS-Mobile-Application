@@ -19,8 +19,8 @@ public class SitesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<SiteDto>>> Search([FromQuery] string? search)
-        => Ok(await _siteService.SearchAsync(search));
+    public async Task<ActionResult<IReadOnlyList<SiteDto>>> Search([FromQuery] string? search, [FromQuery] int? customerId)
+        => Ok(await _siteService.SearchAsync(search, customerId));
 
     [HttpGet("{siteId:int}")]
     public async Task<ActionResult<SiteDetailDto>> GetById(int siteId)

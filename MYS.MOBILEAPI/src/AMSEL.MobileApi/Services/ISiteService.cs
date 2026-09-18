@@ -6,7 +6,7 @@ namespace AMSEL.MobileApi.Services;
 
 public interface ISiteService
 {
-    Task<IReadOnlyList<SiteDto>> SearchAsync(string? search);
+    Task<IReadOnlyList<SiteDto>> SearchAsync(string? search, int? customerId = null);
     Task<SiteDetailDto?> GetByIdAsync(int siteId);
     Task<SiteDetailDto> CreateAsync(CreateSiteRequest request, int locationId, int userId, int employeeId);
     Task<SiteDetailDto> UpdateAsync(int siteId, UpdateSiteRequest request, int locationId, int userId, int employeeId);
@@ -20,9 +20,11 @@ public class DuplicateSiteNameException : Exception
 }
 
 /// <summary>
-/// Searched by site name (not scoped by customer) — Trip Entry picks the
-/// site first, then derives the customer from SITE.CUSTOMERID, rather than
-/// picking a customer first. Manage Sites (this file's CRUD half) is the
+/// Searched by site name, optionally scoped to one customer — Trip Entry
+/// picks the site first with no customerId filter, then derives the
+/// customer from SITE.CUSTOMERID, rather than picking a customer first.
+/// Sales Order does the opposite (customer first, then its own sites only),
+/// so passes customerId. Manage Sites (this file's CRUD half) is the
 /// screen that actually maintains the site-to-customer mapping.
 /// </summary>
 public class SiteService : ISiteService
@@ -34,7 +36,7 @@ public class SiteService : ISiteService
         _connectionFactory = connectionFactory;
     }
 
-    public async Task<IReadOnlyList<SiteDto>> SearchAsync(string? search)
+    public async Task<IReadOnlyList<SiteDto>> SearchAsync(string? search, int? customerId = null)
     {
         using var connection = _connectionFactory.CreateConnection();
         var like = $"%{search}%";
@@ -45,10 +47,11 @@ public class SiteService : ISiteService
             FROM SITE S
             INNER JOIN CUSTOMER C ON C.CUSTOMERID = S.CUSTOMERID
             WHERE S.STATUS = 1 AND C.STATUS = 1
+              AND (@CustomerId IS NULL OR S.CUSTOMERID = @CustomerId)
               AND (@Search IS NULL OR S.SITENAME LIKE @Like)
             ORDER BY S.SITENAME
             """,
-            new { Search = search, Like = like });
+            new { Search = search, Like = like, CustomerId = customerId });
 
         return rows.ToList();
     }

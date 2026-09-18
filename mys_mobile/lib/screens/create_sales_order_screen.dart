@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/customer.dart';
 import '../models/product.dart';
 import '../models/sales_order_line.dart';
+import '../models/site.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
 import '../services/sales_order_service.dart';
+import '../services/site_service.dart';
 import 'customer_form_screen.dart';
 import 'product_form_screen.dart';
 import 'widgets/line_items_grid.dart';
@@ -21,9 +23,10 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
   final _customerService = CustomerService();
   final _productService = ProductService();
   final _salesOrderService = SalesOrderService();
+  final _siteService = SiteService();
 
-  final _shippingAddressController = TextEditingController();
   Customer? _selectedCustomer;
+  Site? _selectedSite;
   final List<SalesOrderLine> _lines = [];
   bool _saving = false;
 
@@ -45,7 +48,27 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
         MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
       ),
     );
-    if (customer != null) setState(() => _selectedCustomer = customer);
+    if (customer == null) return;
+    setState(() {
+      _selectedCustomer = customer;
+      _selectedSite = null;
+    });
+  }
+
+  Future<void> _pickSite() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+
+    final site = await showSearchPicker<Site>(
+      context: context,
+      title: 'Search site',
+      search: (query) => _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      itemLabel: (s) => s.siteName,
+      itemSubtitle: (s) => s.areaName,
+    );
+    if (site != null) setState(() => _selectedSite = site);
   }
 
   Future<void> _addProduct() async {
@@ -105,9 +128,10 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
 
     setState(() => _saving = true);
     try {
+      final site = _selectedSite;
       final result = await _salesOrderService.create(
         customer: _selectedCustomer!,
-        shippingAddress: _shippingAddressController.text.trim(),
+        shippingAddress: site == null ? '' : '${site.siteName}, ${site.areaName}',
         lines: _lines,
       );
       if (!mounted) return;
@@ -122,12 +146,6 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  void dispose() {
-    _shippingAddressController.dispose();
-    super.dispose();
   }
 
   @override
@@ -153,10 +171,16 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _shippingAddressController,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Site Delivery', border: OutlineInputBorder()),
+            InkWell(
+              onTap: _pickSite,
+              child: InputDecorator(
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Site Delivery'),
+                child: Text(
+                  _selectedSite == null
+                      ? 'Tap to select a site'
+                      : '${_selectedSite!.siteName}  (${_selectedSite!.areaName})',
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             Row(
