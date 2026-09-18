@@ -4,6 +4,7 @@ public record PendingDeliveryLineDto(
     int SalesOrderDetId,
     int SalesOrderId,
     string SalesOrderNo,
+    DateTime SalesOrderDate,
     int ProductId,
     string ProductName,
     decimal SalesQty,
@@ -12,6 +13,6 @@ public record PendingDeliveryLineDto(
 
 public record DeliveryLineRequest(int SalesOrderDetId, int SalesOrderId, int ProductId, decimal CurrentDelivery);
 
-public record CreateDeliveryRequest(int DriverEmployeeId, string VehicleNumber, List<DeliveryLineRequest> Lines);
+public record CreateDeliveryRequest(int DriverEmployeeId, string VehicleNumber, int? SiteId, List<DeliveryLineRequest> Lines);
 
 public record CreateDeliveryResponse(int LinesSaved, string DeliveryNo);

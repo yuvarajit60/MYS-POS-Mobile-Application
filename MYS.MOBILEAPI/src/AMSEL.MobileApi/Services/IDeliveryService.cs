@@ -54,6 +54,7 @@ public class DeliveryService : IDeliveryService
         var rows = await connection.QueryAsync<PendingDeliveryLineDto>(
             """
             SELECT SOD.SALESORDERDETID AS SalesOrderDetId, SO.SALESORDERID AS SalesOrderId, SO.ENTRYNO AS SalesOrderNo,
+                   SO.ENTRYDATE AS SalesOrderDate,
                    SOD.PRODUCTID AS ProductId, ISNULL(PR.PRODUCTNAME, '') AS ProductName,
                    SOD.SALESQTY AS SalesQty, CAST(SOD.DELIVERYQTY AS NUMERIC(18,3)) AS DeliveryQty,
                    (SOD.SALESQTY - SOD.DELIVERYQTY) AS BalanceQty
@@ -92,6 +93,7 @@ public class DeliveryService : IDeliveryService
         command.Parameters.Add(new SqlParameter("@LOCATIONID", SqlDbType.Int) { Value = locationId });
         command.Parameters.Add(new SqlParameter("@DRIVERID", SqlDbType.Int) { Value = request.DriverEmployeeId });
         command.Parameters.Add(new SqlParameter("@VEHICLENUMBER", SqlDbType.VarChar, 50) { Value = (object?)request.VehicleNumber ?? DBNull.Value });
+        command.Parameters.Add(new SqlParameter("@SITEID", SqlDbType.Int) { Value = request.SiteId ?? 0 });
         command.Parameters.Add(new SqlParameter("@CREATEUSER", SqlDbType.VarChar, 50) { Value = username });
 
         var linesParam = new SqlParameter("@LINES", SqlDbType.Structured)

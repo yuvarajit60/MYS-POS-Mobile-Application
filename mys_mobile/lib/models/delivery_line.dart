@@ -8,6 +8,7 @@ class DeliveryLine {
   final int salesOrderDetId;
   final int salesOrderId;
   final String salesOrderNo;
+  final DateTime salesOrderDate;
   final int productId;
   final String productName;
   final double salesQty;
@@ -19,6 +20,7 @@ class DeliveryLine {
     required this.salesOrderDetId,
     required this.salesOrderId,
     required this.salesOrderNo,
+    required this.salesOrderDate,
     required this.productId,
     required this.productName,
     required this.salesQty,
@@ -31,6 +33,7 @@ class DeliveryLine {
         salesOrderDetId: json['salesOrderDetId'] as int,
         salesOrderId: json['salesOrderId'] as int,
         salesOrderNo: json['salesOrderNo'] as String,
+        salesOrderDate: DateTime.parse(json['salesOrderDate'] as String),
         productId: json['productId'] as int,
         productName: json['productName'] as String? ?? '',
         salesQty: (json['salesQty'] as num).toDouble(),

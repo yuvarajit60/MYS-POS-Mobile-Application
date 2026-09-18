@@ -3,10 +3,14 @@ import 'package:flutter/services.dart';
 import '../models/customer.dart';
 import '../models/delivery_line.dart';
 import '../models/driver.dart';
+import '../models/site.dart';
+import '../models/site_detail.dart';
 import '../models/vehicle.dart';
 import '../services/delivery_service.dart';
 import '../services/employee_service.dart';
+import '../services/site_service.dart';
 import '../services/vehicle_service.dart';
+import 'site_form_screen.dart';
 import 'widgets/delivery_line_items_grid.dart';
 import 'widgets/search_picker_sheet.dart';
 
@@ -38,9 +42,11 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   final _deliveryService = DeliveryService();
   final _employeeService = EmployeeService();
   final _vehicleService = VehicleService();
+  final _siteService = SiteService();
   final _vehicleNumberController = TextEditingController();
 
   Customer? _selectedCustomer;
+  Site? _selectedSite;
   Driver? _selectedDriver;
   List<DeliveryLine> _lines = [];
   bool _loadingLines = false;
@@ -58,6 +64,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
     setState(() {
       _selectedCustomer = customer;
+      _selectedSite = null;
       _loadingLines = true;
       _lines = [];
     });
@@ -71,6 +78,37 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     } finally {
       if (mounted) setState(() => _loadingLines = false);
     }
+  }
+
+  Future<void> _pickSite() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+
+    final site = await showSearchPicker<Site>(
+      context: context,
+      title: 'Search site',
+      search: (query) => _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      itemLabel: (s) => s.siteName,
+      itemSubtitle: (s) => s.areaName,
+      addNewLabel: 'Add New Site',
+      onAddNew: (context) async {
+        final detail = await Navigator.of(context).push<SiteDetail>(
+          MaterialPageRoute(builder: (_) => SiteFormScreen(initialCustomer: _selectedCustomer)),
+        );
+        if (detail == null) return null;
+        return Site(
+          siteId: detail.siteId,
+          siteName: detail.siteName,
+          areaName: detail.areaName,
+          customerId: detail.customerId,
+          customerName: detail.customerName,
+          mobileNo: _selectedCustomer!.mobileNo,
+        );
+      },
+    );
+    if (site != null) setState(() => _selectedSite = site);
   }
 
   Future<void> _pickDriver() async {
@@ -142,6 +180,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       final result = await _deliveryService.create(
         driver: _selectedDriver!,
         vehicleNumber: _vehicleNumberController.text.trim(),
+        siteId: _selectedSite?.siteId,
         lines: linesToSave,
       );
       if (!mounted) return;
@@ -183,6 +222,18 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                   _selectedCustomer == null
                       ? 'Tap to select a customer'
                       : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: _pickSite,
+              child: InputDecorator(
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Site'),
+                child: Text(
+                  _selectedSite == null
+                      ? 'Tap to select a site'
+                      : '${_selectedSite!.siteName}  (${_selectedSite!.areaName})',
                 ),
               ),
             ),

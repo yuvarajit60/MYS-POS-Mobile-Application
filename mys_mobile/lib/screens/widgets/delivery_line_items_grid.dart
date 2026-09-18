@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../models/delivery_line.dart';
 
 /// Read/edit grid for pending Sales Order lines in Delivery Entry. Only
@@ -23,6 +24,7 @@ class DeliveryLineItemsGrid extends StatefulWidget {
 }
 
 class _DeliveryLineItemsGridState extends State<DeliveryLineItemsGrid> {
+  static final _dateFormat = DateFormat('dd-MMM-yyyy');
   final Map<DeliveryLine, TextEditingController> _controllers = {};
 
   String _formatQty(double qty) => qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toString();
@@ -95,7 +97,10 @@ class _DeliveryLineItemsGridState extends State<DeliveryLineItemsGrid> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(line.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text('Sales Order: ${line.salesOrderNo}', style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                'Sales Order: ${line.salesOrderNo}  •  ${_dateFormat.format(line.salesOrderDate)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -68,6 +68,11 @@
   text snapshot, so the Sales Order screen's site picker has a real
   reference back to dbo.SITE, not just free text.
 
+  Also folds in 019_delivery_details_siteid.sql (see that file's header):
+  DELIVERY_DETAILS.SITEID (new column, same convention) is now saved by
+  SP_MOBILE_CREATE_DELIVERY, backing a Site picker on Delivery Entry
+  scoped to the selected customer, same as Sales Order's.
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
@@ -559,6 +564,20 @@ BEGIN
 END
 GO
 
+-- DELIVERY_DETAILS.SITEID (folded in from 019_delivery_details_siteid.sql
+-- — see that file's header) must exist before SP_MOBILE_CREATE_DELIVERY's
+-- CREATE PROCEDURE below, same deferred-name-resolution reason as every
+-- other prerequisite guard in this script.
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'DELIVERY_DETAILS' AND COLUMN_NAME = 'SITEID'
+)
+BEGIN
+    ALTER TABLE dbo.DELIVERY_DETAILS
+        ADD SITEID INT NOT NULL CONSTRAINT DF_DELIVERY_DETAILS_SITEID DEFAULT 0;
+END
+GO
+
 ------------------------------------------------------------
 -- 7. Delivery Entry (see 005_delivery_entry.sql for the full design note —
 --    DELIVERY_DETAILS has no IDENTITY/PK, IDs are generated via a locked
@@ -586,6 +605,7 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_DELIVERY
     @LOCATIONID    INT,
     @DRIVERID      INT,
     @VEHICLENUMBER VARCHAR(50),
+    @SITEID        INT = 0,
     @CREATEUSER    VARCHAR(50),
     @LINES         dbo.TVP_MOBILE_DELIVERY_LINES READONLY,
     @DELIVERYNO    VARCHAR(MAX) OUTPUT
@@ -661,11 +681,11 @@ BEGIN
         )
         INSERT INTO dbo.DELIVERY_DETAILS
             (DELIVERYID, DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, DELIVERYQTY, BALANCEQTY,
-             DRIVERID, VEHICLENUMBER, DELIVERDATE, CREATE_DATE, CREATE_USER)
+             DRIVERID, VEHICLENUMBER, DELIVERDATE, CREATE_DATE, CREATE_USER, SITEID)
         SELECT
             @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
             (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
-            @DRIVERID, @VEHICLENUMBER, @CurrentDate, GETDATE(), @CREATEUSER
+            @DRIVERID, @VEHICLENUMBER, @CurrentDate, GETDATE(), @CREATEUSER, @SITEID
         FROM Numbered;
 
         UPDATE SOD

@@ -33,12 +33,14 @@ class DeliveryService {
   Future<DeliveryResult> create({
     required Driver driver,
     required String vehicleNumber,
+    int? siteId,
     required List<DeliveryLine> lines,
   }) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/deliveries', data: {
         'driverEmployeeId': driver.employeeId,
         'vehicleNumber': vehicleNumber,
+        'siteId': ?siteId,
         'lines': lines
             .map((l) => {
                   'salesOrderDetId': l.salesOrderDetId,
