@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/session.dart';
 import 'create_delivery_screen.dart';
+import 'create_payment_screen.dart';
 import 'create_sales_order_screen.dart';
 import 'create_trip_entry_screen.dart';
 import 'delivery_reports_screen.dart';
+import 'ledger_report_screen.dart';
 import 'login_screen.dart';
 import 'manage_customers_screen.dart';
 import 'manage_employees_screen.dart';
@@ -56,6 +58,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           label: 'Delivery Entry',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateDeliveryScreen())),
         ),
+        ActionItem(
+          icon: Icons.payments_outlined,
+          label: 'Payment Entry',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreatePaymentScreen())),
+        ),
       ];
 
   List<ActionItem> _reportItems(BuildContext context) => [
@@ -73,6 +80,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.fact_check_outlined,
           label: 'Delivery Report',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DeliveryReportsScreen())),
+        ),
+        ActionItem(
+          icon: Icons.account_balance_wallet_outlined,
+          label: 'Customer Ledger',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LedgerReportScreen())),
         ),
       ];
 

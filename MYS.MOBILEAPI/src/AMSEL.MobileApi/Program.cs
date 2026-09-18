@@ -55,6 +55,8 @@ builder.Services.AddScoped<IVehicleService, VehicleService>();
 builder.Services.AddScoped<IEmployeeVehicleMappingService, EmployeeVehicleMappingService>();
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IDeliveryReportService, DeliveryReportService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ILedgerService, LedgerService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<ISmsGateway, SmsGateway>();

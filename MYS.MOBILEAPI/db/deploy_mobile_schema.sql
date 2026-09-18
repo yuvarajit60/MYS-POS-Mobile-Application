@@ -56,6 +56,12 @@
   OrderDate, USERCREATEDDATE, LASTMODIFYEDDATE, CREATE_DATE, ...) is
   unchanged and still uses GETDATE()/the client-supplied value.
 
+  Also folds in 017_payment_details.sql (see that file's header): a new
+  dbo.PAYMENT_DETAILS table plus SP_MOBILE_CREATE_PAYMENT and
+  SP_MOBILE_GET_CUSTOMER_LEDGER, backing a new Payment Entry screen and
+  customer ledger report (Delivery/Payment rows with a running Outstanding
+  Amount, derived — not stored — from DELIVERY_DETAILS + PAYMENT_DETAILS).
+
   Prerequisites (must already exist in the target database before running
   this — all pre-existing desktop-app objects, not created by this script):
     Tables: USERS, EMPLOYEE, LOCATION, BRANCH, CUSTOMER, CITY, PRODUCT,
@@ -884,3 +890,139 @@ BEGIN
 END
 GO
 
+
+------------------------------------------------------------
+-- 13. Payment Entry + customer ledger report (folded in from
+--     017_payment_details.sql — see that file's header for the full
+--     design note, including why the ledger's running balance is
+--     computed over the customer's entire history rather than just the
+--     filtered date window).
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.PAYMENT_DETAILS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.PAYMENT_DETAILS
+    (
+        PAYMENTID   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PAYMENT_DETAILS PRIMARY KEY,
+        PAYMENTNO   VARCHAR(50)   NOT NULL,
+        LOCATIONID  INT           NOT NULL,
+        CUSTOMERID  INT           NOT NULL,
+        AMOUNT      NUMERIC(18,2) NOT NULL,
+        PAYMENTDATE DATETIME      NOT NULL,
+        CREATE_DATE DATETIME      NOT NULL CONSTRAINT DF_PAYMENT_DETAILS_CREATE_DATE DEFAULT GETDATE(),
+        CREATE_USER VARCHAR(50)   NOT NULL
+    );
+    CREATE INDEX IX_PAYMENT_DETAILS_CUSTOMERID ON dbo.PAYMENT_DETAILS(CUSTOMERID);
+END
+GO
+
+;WITH PaymentFiscalSuffix AS (
+    SELECT LOCATIONID, SUBSTRING(SHORTNAME, CHARINDEX('/', SHORTNAME) + 1, LEN(SHORTNAME)) AS Suffix
+    FROM dbo.TRANSACTIONS
+    WHERE NAME = 'SALESORDER'
+)
+INSERT INTO dbo.TRANSACTIONS (NAME, SHORTNAME, LOCATIONID, LASTNO)
+SELECT 'PAYMENT', 'PMT/' + FS.Suffix, FS.LOCATIONID, 0
+FROM PaymentFiscalSuffix FS
+WHERE NOT EXISTS (
+    SELECT 1 FROM dbo.TRANSACTIONS T
+    WHERE T.NAME = 'PAYMENT' AND T.LOCATIONID = FS.LOCATIONID
+);
+GO
+
+IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_PAYMENT', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT
+(
+    @LOCATIONID INT,
+    @CUSTOMERID INT,
+    @AMOUNT     NUMERIC(18,2),
+    @CREATEUSER VARCHAR(50),
+    @PAYMENTNO  VARCHAR(MAX) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @AMOUNT IS NULL OR @AMOUNT <= 0
+    BEGIN
+        RAISERROR('Payment amount must be greater than zero.', 16, 1);
+        RETURN;
+    END
+
+    EXEC dbo.SP_GENERATETRANNO
+         @TRANSACTIONNAME = 'PAYMENT',
+         @TRANNO = @PAYMENTNO OUTPUT,
+         @USERSHORTNAME = '',
+         @LOCATIONID = @LOCATIONID;
+
+    DECLARE @CurrentDate DATETIME;
+    SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+    IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+
+    INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTDATE, CREATE_DATE, CREATE_USER)
+    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @CurrentDate, GETDATE(), @CREATEUSER);
+END
+GO
+
+IF OBJECT_ID(N'dbo.SP_MOBILE_GET_CUSTOMER_LEDGER', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_MOBILE_GET_CUSTOMER_LEDGER;
+GO
+
+CREATE PROCEDURE dbo.SP_MOBILE_GET_CUSTOMER_LEDGER
+(
+    @LOCATIONID INT,
+    @CUSTOMERID INT,
+    @FROMDATE   DATE = NULL,
+    @TODATE     DATE = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH DeliveryTxns AS (
+        SELECT
+            DD.DELIVERYNO AS TXNNO,
+            MIN(DD.DELIVERDATE) AS TXNDATE,
+            'Delivery' AS TXNTYPE,
+            SUM((SOD.TOTALAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY) AS TOTALAMOUNT,
+            CAST(0 AS NUMERIC(18,2)) AS RECEIVEDAMOUNT
+        FROM dbo.DELIVERY_DETAILS DD
+        INNER JOIN dbo.SALESORDER_DETAILS SOD ON SOD.SALESORDERDETID = DD.SALESORDERDETID
+        INNER JOIN dbo.SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
+        WHERE SO.CUSTOMERID = @CUSTOMERID AND SO.LOCATIONID = @LOCATIONID
+        GROUP BY DD.DELIVERYNO
+    ),
+    PaymentTxns AS (
+        SELECT
+            PD.PAYMENTNO AS TXNNO,
+            PD.PAYMENTDATE AS TXNDATE,
+            'Payment' AS TXNTYPE,
+            CAST(0 AS NUMERIC(18,2)) AS TOTALAMOUNT,
+            PD.AMOUNT AS RECEIVEDAMOUNT
+        FROM dbo.PAYMENT_DETAILS PD
+        WHERE PD.CUSTOMERID = @CUSTOMERID AND PD.LOCATIONID = @LOCATIONID
+    ),
+    Combined AS (
+        SELECT * FROM DeliveryTxns
+        UNION ALL
+        SELECT * FROM PaymentTxns
+    ),
+    Running AS (
+        SELECT
+            TXNDATE, TXNTYPE, TXNNO, TOTALAMOUNT, RECEIVEDAMOUNT,
+            SUM(TOTALAMOUNT - RECEIVEDAMOUNT) OVER (
+                ORDER BY TXNDATE, TXNNO
+                ROWS UNBOUNDED PRECEDING
+            ) AS OUTSTANDINGAMOUNT
+        FROM Combined
+    )
+    SELECT TXNDATE, TXNTYPE, TXNNO, TOTALAMOUNT, RECEIVEDAMOUNT, OUTSTANDINGAMOUNT
+    FROM Running
+    WHERE (@FROMDATE IS NULL OR CAST(TXNDATE AS DATE) >= @FROMDATE)
+      AND (@TODATE IS NULL OR CAST(TXNDATE AS DATE) <= @TODATE)
+    ORDER BY TXNDATE, TXNNO;
+END
+GO
