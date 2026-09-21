@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import '../core/company_provider.dart';
+import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
 import '../models/ledger_entry.dart';
 import '../services/ledger_service.dart';
@@ -81,71 +84,98 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     }
   }
 
+  Future<void> _print() async {
+    final doc = await ReportPdfBuilder.buildLedgerSummary(
+      rows: _rows ?? [],
+      company: CompanyProvider.instance.company,
+      customerName: _selectedCustomer?.customerName ?? '',
+      fromDate: _fromDate,
+      toDate: _toDate,
+    );
+    await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Customer Ledger')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            InkWell(
-              onTap: _pickCustomer,
-              child: InputDecorator(
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer'),
-                child: Text(_selectedCustomer?.customerName ?? 'Tap to select a customer'),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkWell(
+                    onTap: _pickCustomer,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer'),
+                      child: Text(_selectedCustomer?.customerName ?? 'Tap to select a customer'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _pickDate(isFrom: true),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: 'From Date',
+                              suffixIcon: _fromDate == null
+                                  ? null
+                                  : IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() => _fromDate = null)),
+                            ),
+                            child: Text(_fromDate == null ? 'All' : _dateFormat.format(_fromDate!)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _pickDate(isFrom: false),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              labelText: 'To Date',
+                              suffixIcon: _toDate == null
+                                  ? null
+                                  : IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() => _toDate = null)),
+                            ),
+                            child: Text(_toDate == null ? 'All' : _dateFormat.format(_toDate!)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: (_loading || _selectedCustomer == null) ? null : _generate,
+                    child: _loading ? const CircularProgressIndicator() : const Text('Generate Report'),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_rows != null) _buildResults(),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _pickDate(isFrom: true),
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: 'From Date',
-                        suffixIcon: _fromDate == null
-                            ? null
-                            : IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() => _fromDate = null)),
-                      ),
-                      child: Text(_fromDate == null ? 'All' : _dateFormat.format(_fromDate!)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _pickDate(isFrom: false),
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: 'To Date',
-                        suffixIcon: _toDate == null
-                            ? null
-                            : IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() => _toDate = null)),
-                      ),
-                      child: Text(_toDate == null ? 'All' : _dateFormat.format(_toDate!)),
-                    ),
-                  ),
-                ),
-              ],
+          ),
+          if (_rows?.isNotEmpty ?? false)
+            SafeArea(
+              minimum: const EdgeInsets.all(16),
+              child: FilledButton.icon(
+                icon: const Icon(Icons.print),
+                label: const Text('Print'),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                onPressed: _print,
+              ),
             ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: (_loading || _selectedCustomer == null) ? null : _generate,
-              child: _loading ? const CircularProgressIndicator() : const Text('Generate Report'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-            const SizedBox(height: 16),
-            if (_rows != null) _buildResults(),
-          ],
-        ),
+        ],
       ),
     );
   }
