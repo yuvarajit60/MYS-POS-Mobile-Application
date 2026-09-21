@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../models/area.dart';
 import '../models/city.dart';
 import '../models/customer.dart';
 import '../models/site_detail.dart';
+import '../services/area_service.dart';
 import '../services/city_service.dart';
 import '../services/customer_service.dart';
 import '../services/site_service.dart';
+import 'area_form_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 
 /// Add-or-edit form for a Site — maps a site/delivery location to the
@@ -21,13 +24,14 @@ class SiteFormScreen extends StatefulWidget {
 class _SiteFormScreenState extends State<SiteFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final _siteNameController = TextEditingController(text: widget.editing?.siteName);
-  late final _areaNameController = TextEditingController(text: widget.editing?.areaName);
   final _siteService = SiteService();
   final _customerService = CustomerService();
   final _cityService = CityService();
+  final _areaService = AreaService();
 
   Customer? _selectedCustomer;
   City? _selectedCity;
+  Area? _selectedArea;
   bool _saving = false;
   bool _deleting = false;
 
@@ -40,6 +44,9 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
     if (editing != null) {
       _selectedCustomer = Customer(customerId: editing.customerId, customerName: editing.customerName, mobileNo: '');
       _selectedCity = City(cityId: editing.cityId, cityName: editing.cityName);
+      if (editing.areaId > 0) {
+        _selectedArea = Area(areaId: editing.areaId, areaName: editing.areaName, cityId: editing.cityId, cityName: editing.cityName);
+      }
     } else if (widget.initialCustomer != null) {
       _selectedCustomer = widget.initialCustomer;
     }
@@ -63,7 +70,30 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
       search: _cityService.search,
       itemLabel: (c) => c.cityName,
     );
-    if (city != null) setState(() => _selectedCity = city);
+    if (city == null) return;
+    setState(() {
+      _selectedCity = city;
+      _selectedArea = null;
+    });
+  }
+
+  Future<void> _pickArea() async {
+    if (_selectedCity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a city first.')));
+      return;
+    }
+
+    final area = await showSearchPicker<Area>(
+      context: context,
+      title: 'Search area',
+      search: (query) => _areaService.search(query, cityId: _selectedCity!.cityId),
+      itemLabel: (a) => a.areaName,
+      addNewLabel: 'Add New Area',
+      onAddNew: (context) => Navigator.of(context).push<Area>(
+        MaterialPageRoute(builder: (_) => AreaFormScreen(initialCity: _selectedCity)),
+      ),
+    );
+    if (area != null) setState(() => _selectedArea = area);
   }
 
   Future<void> _save() async {
@@ -76,23 +106,26 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a city.')));
       return;
     }
+    if (_selectedArea == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select an area.')));
+      return;
+    }
 
     setState(() => _saving = true);
     try {
       final siteName = _siteNameController.text.trim();
-      final areaName = _areaNameController.text.trim();
 
       final site = _isEditing
           ? await _siteService.update(
               siteId: widget.editing!.siteId,
               siteName: siteName,
-              areaName: areaName,
+              area: _selectedArea!,
               city: _selectedCity!,
               customer: _selectedCustomer!,
             )
           : await _siteService.create(
               siteName: siteName,
-              areaName: areaName,
+              area: _selectedArea!,
               city: _selectedCity!,
               customer: _selectedCustomer!,
             );
@@ -139,7 +172,6 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
   @override
   void dispose() {
     _siteNameController.dispose();
-    _areaNameController.dispose();
     super.dispose();
   }
 
@@ -179,16 +211,19 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _areaNameController,
-                decoration: const InputDecoration(labelText: 'Area Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
               InkWell(
                 onTap: _pickCity,
                 child: InputDecorator(
                   decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'City'),
                   child: Text(_selectedCity?.cityName ?? 'Tap to select a city'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: _pickArea,
+                child: InputDecorator(
+                  decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Area'),
+                  child: Text(_selectedArea?.areaName ?? 'Tap to select an area'),
                 ),
               ),
               const SizedBox(height: 24),

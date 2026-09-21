@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../core/api_client.dart';
+import '../models/area.dart';
 import '../models/city.dart';
 import '../models/customer.dart';
 import '../models/site.dart';
@@ -30,14 +31,15 @@ class SiteService {
 
   Future<SiteDetail> create({
     required String siteName,
-    required String areaName,
+    required Area area,
     required City city,
     required Customer customer,
   }) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/sites', data: {
         'siteName': siteName,
-        'areaName': areaName,
+        'areaName': area.areaName,
+        'areaId': area.areaId,
         'cityId': city.cityId,
         'customerId': customer.customerId,
       });
@@ -50,14 +52,15 @@ class SiteService {
   Future<SiteDetail> update({
     required int siteId,
     required String siteName,
-    required String areaName,
+    required Area area,
     required City city,
     required Customer customer,
   }) async {
     try {
       final response = await ApiClient.instance.dio.put('/api/sites/$siteId', data: {
         'siteName': siteName,
-        'areaName': areaName,
+        'areaName': area.areaName,
+        'areaId': area.areaId,
         'cityId': city.cityId,
         'customerId': customer.customerId,
       });

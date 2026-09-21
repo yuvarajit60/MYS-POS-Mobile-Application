@@ -62,7 +62,7 @@ public class SiteService : ISiteService
         return await connection.QueryFirstOrDefaultAsync<SiteDetailDto>(
             """
             SELECT S.SITEID AS SiteId, ISNULL(S.SITENAME, '') AS SiteName, ISNULL(S.AREANAME, '') AS AreaName,
-                   S.CITYID AS CityId, ISNULL(CI.CITYNAME, '') AS CityName,
+                   S.AREAID AS AreaId, S.CITYID AS CityId, ISNULL(CI.CITYNAME, '') AS CityName,
                    S.CUSTOMERID AS CustomerId, C.CUSTOMERNAME AS CustomerName
             FROM SITE S
             LEFT JOIN CITY CI ON CI.CITYID = S.CITYID
@@ -98,12 +98,12 @@ public class SiteService : ISiteService
         var siteId = await connection.QuerySingleAsync<int>(
             """
             INSERT INTO SITE
-                (SITENAME, AREANAME, CITYID, STATUS, CUSTOMERID,
+                (SITENAME, AREANAME, AREAID, CITYID, STATUS, CUSTOMERID,
                  CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
                  USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID)
             OUTPUT INSERTED.SITEID
             VALUES
-                (@SiteName, @AreaName, @CityId, 1, @CustomerId,
+                (@SiteName, @AreaName, @AreaId, @CityId, 1, @CustomerId,
                  @LocationId, @LocationId, @UserId, @UserId,
                  GETDATE(), GETDATE(), @EmployeeId, @EmployeeId)
             """,
@@ -111,6 +111,7 @@ public class SiteService : ISiteService
             {
                 request.SiteName,
                 request.AreaName,
+                request.AreaId,
                 request.CityId,
                 request.CustomerId,
                 LocationId = locationId,
@@ -136,7 +137,7 @@ public class SiteService : ISiteService
         await connection.ExecuteAsync(
             """
             UPDATE SITE
-            SET SITENAME = @SiteName, AREANAME = @AreaName, CITYID = @CityId, CUSTOMERID = @CustomerId,
+            SET SITENAME = @SiteName, AREANAME = @AreaName, AREAID = @AreaId, CITYID = @CityId, CUSTOMERID = @CustomerId,
                 MODIFYEDLOCATIONID = @LocationId, LASTMODIFYEDUSERID = @UserId,
                 LASTMODIFYEDDATE = GETDATE(), MODIFYEDEMPLOYEEID = @EmployeeId
             WHERE SITEID = @SiteId AND STATUS = 1
@@ -146,6 +147,7 @@ public class SiteService : ISiteService
                 SiteId = siteId,
                 request.SiteName,
                 request.AreaName,
+                request.AreaId,
                 request.CityId,
                 request.CustomerId,
                 LocationId = locationId,

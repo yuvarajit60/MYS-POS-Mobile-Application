@@ -8,6 +8,7 @@ import 'create_trip_entry_screen.dart';
 import 'delivery_reports_screen.dart';
 import 'ledger_report_screen.dart';
 import 'login_screen.dart';
+import 'manage_areas_screen.dart';
 import 'manage_customers_screen.dart';
 import 'manage_employees_screen.dart';
 import 'manage_products_screen.dart';
@@ -103,6 +104,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.location_on_outlined,
           label: 'Site',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageSitesScreen())),
+        ),
+        ActionItem(
+          icon: Icons.map_outlined,
+          label: 'Area',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageAreasScreen())),
         ),
         ActionItem(
           icon: Icons.directions_car_outlined,

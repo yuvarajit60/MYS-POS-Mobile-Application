@@ -48,6 +48,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
 builder.Services.AddScoped<IChangeDateService, ChangeDateService>();
 builder.Services.AddScoped<ISiteService, SiteService>();
+builder.Services.AddScoped<IAreaService, AreaService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ITripEntryService, TripEntryService>();
 builder.Services.AddScoped<ITripEntryReportService, TripEntryReportService>();
