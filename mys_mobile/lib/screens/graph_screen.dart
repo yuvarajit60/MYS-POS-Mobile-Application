@@ -1,7 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
-import '../core/current_date_provider.dart';
 import '../models/graph_data_point.dart';
 import '../services/report_service.dart';
 
@@ -27,13 +26,6 @@ class _GraphScreenState extends State<GraphScreen> {
   @override
   void initState() {
     super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    await CurrentDateProvider.instance.ensureLoaded();
-    if (!mounted) return;
-    setState(() => _year = CurrentDateProvider.instance.currentDate.year);
     _load();
   }
 

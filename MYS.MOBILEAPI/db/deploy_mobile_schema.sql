@@ -46,15 +46,16 @@
   database is '26-27/'. This is a one-off correction for a mistake, not a
   general prerequisite, so it isn't folded in here.
 
-  Also folds in 016_current_date_entrydate.sql (see that file's header):
-  SP_MOBILE_CREATE_SALESORDER/TRIPENTRY/DELIVERY now read the desktop
-  app's "business date" from dbo.CHANGE_DATE for ENTRYDATE/ENTRYDATE/
-  DELIVERDATE respectively, instead of GETDATE() — CHANGE_DATE and
-  DELIVERY_DETAILS.DELIVERDATE both already existed by hand on
-  db_ams_erp/DB_AMS_ERP_SMS; the guards just before section 4 create and
-  seed them for any other database. Every other date column (TRIPDATE,
-  OrderDate, USERCREATEDDATE, LASTMODIFYEDDATE, CREATE_DATE, ...) is
-  unchanged and still uses GETDATE()/the client-supplied value.
+  016_current_date_entrydate.sql originally made SP_MOBILE_CREATE_SALESORDER/
+  TRIPENTRY/DELIVERY read the desktop app's "business date" from
+  dbo.CHANGE_DATE for ENTRYDATE/ENTRYDATE/DELIVERDATE — this was ROLLED
+  BACK by 021_rollback_changedate_for_entries.sql (see that file's header):
+  all three now use GETDATE() again, since CHANGE_DATE could sit days
+  behind the real date and caused more confusion than it solved for these
+  three tables. dbo.CHANGE_DATE itself is untouched and still exists —
+  Payment Entry's PAYMENTDATE (017_payment_details.sql) still reads it,
+  that wasn't part of this rollback. TRIPDATE remains exactly what the
+  rep entered, as it always has.
 
   Also folds in 017_payment_details.sql (see that file's header): a new
   dbo.PAYMENT_DETAILS table plus SP_MOBILE_CREATE_PAYMENT and
@@ -72,6 +73,15 @@
   DELIVERY_DETAILS.SITEID (new column, same convention) is now saved by
   SP_MOBILE_CREATE_DELIVERY, backing a Site picker on Delivery Entry
   scoped to the selected customer, same as Sales Order's.
+
+  Also folds in 022_area_master.sql (see that file's header): dbo.AREA
+  already existed by hand on db_ams_pos_test with real data and its own
+  PascalCase schema (AreaId/AreaName/CityId/IsActive/CreatedOn/CreatedBy/
+  UpdatedOn/UpdatedBy) — NOT this project's usual ALLCAPS convention —
+  so this matches that shape exactly rather than inventing a different
+  one, and only creates it where missing (real prod). Plus SITE.AREAID,
+  so the Site form's Area field is a picker sourced from dbo.AREA
+  (scoped to the site's own City) instead of free text.
 
   Also folds in 020_salesorder_discount.sql (see that file's header):
   dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
@@ -303,13 +313,10 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
-        -- ENTRYDATE uses the desktop app's "business date" (CHANGE_DATE),
-        -- not the wall clock — falls back to GETDATE() if that's somehow
-        -- unset. Every other date column below is untouched.
-        DECLARE @CurrentDate DATETIME;
-        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
-
+        -- ENTRYDATE uses the wall clock (GETDATE()) — rolled back from
+        -- dbo.CHANGE_DATE (see 021_rollback_changedate_for_entries.sql):
+        -- the desktop "business date" could sit days behind the real date,
+        -- which caused more confusion than it solved for this table.
         DECLARE @RawNetAmount NUMERIC(18,2), @RoundedNetAmount NUMERIC(18,2);
 
         SELECT @RawNetAmount = SUM(LINETAXABLE)
@@ -326,7 +333,7 @@ BEGIN
              USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
              SHIPPINGADDRESS, CUSTOMERNAME, OrderDate, SITEID)
         SELECT
-            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
+            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, 'PENDING',
             SUM(LINETAXABLE), SUM(ROUND(LINETAXABLE * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
             SUM(RATE * QTY), 0, SUM(RATE * QTY - LINETAXABLE), (@RoundedNetAmount - @RawNetAmount), @RoundedNetAmount,
             0, 0, 0, 0, 0, 0, 0, 0,
@@ -459,14 +466,11 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
-        -- ENTRYDATE uses the desktop app's "business date" (CHANGE_DATE),
-        -- not the wall clock — falls back to GETDATE() if that's somehow
-        -- unset. TRIPDATE (client-supplied) and every other date column
-        -- below are untouched.
-        DECLARE @CurrentDate DATETIME;
-        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
-
+        -- ENTRYDATE uses the wall clock (GETDATE()) — rolled back from
+        -- dbo.CHANGE_DATE (see 021_rollback_changedate_for_entries.sql).
+        -- TRIPDATE stays exactly as the rep entered it (@TRIPDATE, below)
+        -- — this was never tied to CHANGE_DATE and isn't part of the
+        -- rollback.
         DECLARE @TripRawNetAmount NUMERIC(18,2), @TripRoundedNetAmount NUMERIC(18,2);
 
         SELECT @TripRawNetAmount = SUM(RATE * QTY)
@@ -483,7 +487,7 @@ BEGIN
              USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID,
              SITEID, TRIPNO, TRIPDATE, CONVERTTOSALES)
         SELECT
-            @ENTRYNO, @CurrentDate, @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, @EMPLOYEEID, @SITENAME,
+            @ENTRYNO, GETDATE(), @LOCATIONID, 0, @MOBILENO, @CUSTOMERID, @EMPLOYEEID, @SITENAME,
             SUM(RATE * QTY), SUM(ROUND(RATE * QTY * (SALESCGSTPERCENTAGE + SALESSGSTPERCENTAGE + SALESIGSTPERCENTAGE) / 100.0, 2)),
             SUM(RATE * QTY), (@TripRoundedNetAmount - @TripRawNetAmount), @TripRoundedNetAmount, 0,
             0, 0, 0, NULL,
@@ -683,13 +687,8 @@ BEGIN
              @USERSHORTNAME = '',
              @LOCATIONID = @LOCATIONID;
 
-        -- DELIVERDATE uses the desktop app's "business date" (CHANGE_DATE),
-        -- not the wall clock — falls back to GETDATE() if that's somehow
-        -- unset. CREATE_DATE below is untouched.
-        DECLARE @CurrentDate DATETIME;
-        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
-
+        -- DELIVERDATE uses the wall clock (GETDATE()) — rolled back from
+        -- dbo.CHANGE_DATE (see 021_rollback_changedate_for_entries.sql).
         DECLARE @NextId INT;
         SELECT @NextId = ISNULL(MAX(DELIVERYID), 0) FROM dbo.DELIVERY_DETAILS WITH (TABLOCKX, HOLDLOCK);
 
@@ -703,7 +702,7 @@ BEGIN
         SELECT
             @NextId + RN, @DELIVERYNO, SALESORDERID, SALESORDERDETID, PRODUCTID, CURRENTDELIVERY,
             (SALESQTY - ALREADYDELIVERED - CURRENTDELIVERY),
-            @DRIVERID, @VEHICLENUMBER, @CurrentDate, GETDATE(), @CREATEUSER, @SITEID
+            @DRIVERID, @VEHICLENUMBER, GETDATE(), GETDATE(), @CREATEUSER, @SITEID
         FROM Numbered;
 
         UPDATE SOD
@@ -1084,5 +1083,35 @@ BEGIN
     WHERE (@FROMDATE IS NULL OR CAST(TXNDATE AS DATE) >= @FROMDATE)
       AND (@TODATE IS NULL OR CAST(TXNDATE AS DATE) <= @TODATE)
     ORDER BY TXNDATE, TXNNO;
+END
+GO
+
+------------------------------------------------------------
+-- 14. Area master + SITE.AREAID (folded in from 022_area_master.sql —
+--     see that file's header for the full design note).
+------------------------------------------------------------
+IF OBJECT_ID(N'dbo.AREA', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AREA
+    (
+        AreaId    INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Area PRIMARY KEY,
+        AreaName  NVARCHAR(MAX) NOT NULL,
+        CityId    INT           NOT NULL,
+        IsActive  BIT           NOT NULL CONSTRAINT DF_Area_IsActive DEFAULT 1,
+        CreatedOn DATETIME2     NOT NULL CONSTRAINT DF_Area_CreatedOn DEFAULT SYSDATETIME(),
+        CreatedBy NVARCHAR(MAX) NULL,
+        UpdatedOn DATETIME2     NOT NULL CONSTRAINT DF_Area_UpdatedOn DEFAULT SYSDATETIME(),
+        UpdatedBy NVARCHAR(MAX) NULL
+    );
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'SITE' AND COLUMN_NAME = 'AREAID'
+)
+BEGIN
+    ALTER TABLE dbo.SITE
+        ADD AREAID INT NOT NULL CONSTRAINT DF_SITE_AREAID DEFAULT 0;
 END
 GO

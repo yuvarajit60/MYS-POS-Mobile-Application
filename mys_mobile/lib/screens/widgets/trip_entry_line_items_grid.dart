@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/current_date_provider.dart';
 import '../../models/trip_entry_line.dart';
 
 /// Read/edit grid for trip-entry line items. Mirrors LineItemsGrid's
@@ -100,7 +99,7 @@ class _TripEntryLineItemsGridState extends State<TripEntryLineItemsGrid> {
   }
 
   Future<void> _pickDateTime(BuildContext context, DateTime? initial, ValueChanged<DateTime> onPicked) async {
-    final now = CurrentDateProvider.instance.currentDate;
+    final now = DateTime.now();
     final date = await showDatePicker(
       context: context,
       initialDate: initial ?? now,
