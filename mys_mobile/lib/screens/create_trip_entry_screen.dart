@@ -162,13 +162,18 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   /// (MeterClose - MeterStart, entered directly as decimal hours — e.g.
   /// 120.4 to 122.6 is a 2.2 hour / 2h12m difference) pair once both
   /// sides are set — Qty stays directly editable afterward, same as Rate,
-  /// in case the rep needs to override it. Rounded to the nearest tenth
-  /// of an hour (0.1 = 6 minutes) for both modes — this business bills
-  /// equipment-hours the same way a mechanical hour-meter reads (tenths),
-  /// not to the minute, so e.g. 2h08m (2.1333... true hours) bills as 2.1,
-  /// not 2.13. This also sidesteps the repeating/imprecise doubles that
-  /// dividing minutes by 60 (or subtracting decimal meter readings)
-  /// routinely produces, like 2.3666666666666667.
+  /// in case the rep needs to override it.
+  ///
+  /// Hours mode bills the exact elapsed time (e.g. 2h15m = 2.25, billed as
+  /// 2400 for the 2 hours plus 300 for the 15 minutes at a 1200/hr rate) —
+  /// rounded only to the nearest hundredth to absorb the repeating decimals
+  /// dividing minutes by 60 produces (e.g. 2.3666666666666667), not to
+  /// the nearest tenth: that previously overbilled ties like 2.25 by
+  /// rounding up to 2.3 (18 min instead of 15).
+  ///
+  /// Meter mode keeps rounding to the nearest tenth of an hour (0.1 = 6
+  /// minutes) — a mechanical hour-meter reads in tenths, so e.g. 2h08m
+  /// (2.1333... true hours) bills as 2.1, not 2.13.
   void _recomputeQty(int index) {
     final line = _lines[index];
     if (line.meterOrHours == MeterOrHours.hours) {
@@ -176,7 +181,7 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       final close = line.timeClose;
       if (start != null && close != null) {
         final hours = close.difference(start).inMinutes / 60.0;
-        if (hours > 0) line.qty = _roundToTenth(hours);
+        if (hours > 0) line.qty = _roundToHundredth(hours);
       }
     } else {
       final start = line.meterStart;
@@ -190,6 +195,8 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   }
 
   double _roundToTenth(double value) => (value * 10).round() / 10;
+
+  double _roundToHundredth(double value) => (value * 100).round() / 100;
 
   void _onQtyChanged(int index, double newQty) => setState(() => _lines[index].qty = newQty);
 
