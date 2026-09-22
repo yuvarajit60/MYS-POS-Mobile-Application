@@ -55,6 +55,7 @@ class TripEntryDetail {
   final int tripEntryId;
   final String entryNo;
   final DateTime entryDate;
+  final DateTime tripDate;
   final String customerName;
   final String mobileNo;
   final String siteName;
@@ -69,6 +70,7 @@ class TripEntryDetail {
     required this.tripEntryId,
     required this.entryNo,
     required this.entryDate,
+    required this.tripDate,
     required this.customerName,
     required this.mobileNo,
     required this.siteName,
@@ -84,6 +86,7 @@ class TripEntryDetail {
         tripEntryId: json['tripEntryId'] as int,
         entryNo: json['entryNo'] as String,
         entryDate: DateTime.parse(json['entryDate'] as String),
+        tripDate: DateTime.parse(json['tripDate'] as String),
         customerName: json['customerName'] as String,
         mobileNo: json['mobileNo'] as String? ?? '',
         siteName: json['siteName'] as String? ?? '',

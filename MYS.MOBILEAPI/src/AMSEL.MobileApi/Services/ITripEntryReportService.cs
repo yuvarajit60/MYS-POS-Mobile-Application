@@ -37,7 +37,7 @@ public class TripEntryReportService : ITripEntryReportService
         var like = $"%{tripEntryNo}%";
         var rows = await connection.QueryAsync<TripEntrySummaryDto>(
             """
-            SELECT TE.TRIPENTRYID AS TripEntryId, TE.ENTRYNO AS EntryNo, TE.ENTRYDATE AS EntryDate,
+            SELECT TE.TRIPENTRYID AS TripEntryId, TE.ENTRYNO AS EntryNo, TE.ENTRYDATE AS EntryDate, TE.TRIPDATE AS TripDate,
                    C.CUSTOMERNAME AS CustomerName, ISNULL(TE.MOBILENO, '') AS MobileNo,
                    ISNULL(TE.SITENAME, '') AS SiteName, ISNULL(EMP.EMPLOYEENAME, '') AS DriverName,
                    TE.NETAMOUNT AS NetAmount
@@ -70,7 +70,7 @@ public class TripEntryReportService : ITripEntryReportService
 
         var header = await connection.QueryFirstOrDefaultAsync(
             """
-            SELECT TE.TRIPENTRYID, TE.ENTRYNO, TE.ENTRYDATE, C.CUSTOMERNAME, ISNULL(TE.MOBILENO, '') AS MOBILENO,
+            SELECT TE.TRIPENTRYID, TE.ENTRYNO, TE.ENTRYDATE, TE.TRIPDATE, C.CUSTOMERNAME, ISNULL(TE.MOBILENO, '') AS MOBILENO,
                    ISNULL(TE.SITENAME, '') AS SITENAME, ISNULL(EMP.EMPLOYEENAME, '') AS DRIVERNAME,
                    TE.TAXABLEVALUE, TE.TOTALTAX, TE.ROUNDOFF, TE.NETAMOUNT
             FROM TRIPENTRY TE
@@ -101,6 +101,7 @@ public class TripEntryReportService : ITripEntryReportService
             (int)header.TRIPENTRYID,
             (string)header.ENTRYNO,
             (DateTime)header.ENTRYDATE,
+            (DateTime)header.TRIPDATE,
             (string)header.CUSTOMERNAME,
             (string)header.MOBILENO,
             (string)header.SITENAME,

@@ -226,7 +226,10 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
           Card(
             child: ListTile(
               title: Text(row.customerName),
-              subtitle: Text('${row.entryNo}  |  ${_dateFormat.format(row.entryDate)}\n${row.siteName} • ${row.driverName}'),
+              subtitle: Text(
+                '${row.entryNo}  |  Entry: ${_dateFormat.format(row.entryDate)}  |  Trip: ${_dateFormat.format(row.tripDate)}\n'
+                '${row.siteName} • ${row.driverName}',
+              ),
               isThreeLine: true,
               trailing: Text(row.netAmount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600)),
               onTap: () => Navigator.of(context).push(

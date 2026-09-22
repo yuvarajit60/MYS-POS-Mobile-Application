@@ -203,18 +203,19 @@ class ReportPdfBuilder {
         ),
         build: (context) => [
           pw.TableHelper.fromTextArray(
-            headers: ['Entry No', 'Date', 'Customer', 'Site', 'Driver', 'Net Amount'],
+            headers: ['Entry No', 'Entry Date', 'Trip Date', 'Customer', 'Site', 'Driver', 'Net Amount'],
             data: rows
                 .map((r) => [
                       r.entryNo,
                       _dateFormat.format(r.entryDate),
+                      _dateFormat.format(r.tripDate),
                       r.customerName,
                       r.siteName,
                       r.driverName,
                       _amountFormat.format(r.netAmount),
                     ])
                 .toList(),
-            cellAlignments: {5: pw.Alignment.centerRight},
+            cellAlignments: {6: pw.Alignment.centerRight},
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
             cellStyle: const pw.TextStyle(fontSize: 10),
@@ -268,7 +269,8 @@ class ReportPdfBuilder {
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
                     pw.Text('Entry No: ${tripEntry.entryNo}', style: const pw.TextStyle(fontSize: 10)),
-                    pw.Text('Date: ${_dateFormat.format(tripEntry.entryDate)}', style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text('Entry Date: ${_dateFormat.format(tripEntry.entryDate)}', style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text('Trip Date: ${_dateFormat.format(tripEntry.tripDate)}', style: const pw.TextStyle(fontSize: 10)),
                   ],
                 ),
               ],
