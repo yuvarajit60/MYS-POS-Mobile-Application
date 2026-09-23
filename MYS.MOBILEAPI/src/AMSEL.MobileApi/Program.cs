@@ -58,6 +58,7 @@ builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IDeliveryReportService, DeliveryReportService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ILedgerService, LedgerService>();
+builder.Services.AddScoped<IPaymentReportService, PaymentReportService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<ISmsGateway, SmsGateway>();

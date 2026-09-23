@@ -18,11 +18,12 @@ class PaymentService {
     return (response.data as List).map((e) => Customer.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<PaymentResult> create({required int customerId, required double amount}) async {
+  Future<PaymentResult> create({required int customerId, required double amount, required String paymentType}) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/payments', data: {
         'customerId': customerId,
         'amount': amount,
+        'paymentType': paymentType,
       });
       final data = response.data as Map<String, dynamic>;
       return PaymentResult(paymentNo: data['paymentNo'] as String);

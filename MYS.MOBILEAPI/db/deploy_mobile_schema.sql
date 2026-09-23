@@ -83,6 +83,11 @@
   so the Site form's Area field is a picker sourced from dbo.AREA
   (scoped to the site's own City) instead of free text.
 
+  Also folds in 023_payment_type.sql (see that file's header):
+  PAYMENT_DETAILS.PAYMENTTYPE (new column, defaults to 'Cash') captures
+  the Payment Entry screen's new Payment Type selector (Cash/UPI/Acc
+  Transfer) and is now saved by SP_MOBILE_CREATE_PAYMENT.
+
   Also folds in 020_salesorder_discount.sql (see that file's header):
   dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
   flat, tax-exclusive, per-line amount from the Sales Order screen's new
@@ -966,6 +971,7 @@ BEGIN
         LOCATIONID  INT           NOT NULL,
         CUSTOMERID  INT           NOT NULL,
         AMOUNT      NUMERIC(18,2) NOT NULL,
+        PAYMENTTYPE VARCHAR(20)   NOT NULL CONSTRAINT DF_PAYMENT_DETAILS_PAYMENTTYPE_NEW DEFAULT 'Cash',
         PAYMENTDATE DATETIME      NOT NULL,
         CREATE_DATE DATETIME      NOT NULL CONSTRAINT DF_PAYMENT_DETAILS_CREATE_DATE DEFAULT GETDATE(),
         CREATE_USER VARCHAR(50)   NOT NULL
@@ -988,6 +994,20 @@ WHERE NOT EXISTS (
 );
 GO
 
+-- PAYMENT_DETAILS.PAYMENTTYPE (folded in from 023_payment_type.sql — see
+-- that file's header) must exist before SP_MOBILE_CREATE_PAYMENT's CREATE
+-- PROCEDURE below, same deferred-name-resolution reason as every other
+-- prerequisite guard in this script.
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'PAYMENT_DETAILS' AND COLUMN_NAME = 'PAYMENTTYPE'
+)
+BEGIN
+    ALTER TABLE dbo.PAYMENT_DETAILS
+        ADD PAYMENTTYPE VARCHAR(20) NOT NULL CONSTRAINT DF_PAYMENT_DETAILS_PAYMENTTYPE DEFAULT 'Cash';
+END
+GO
+
 IF OBJECT_ID(N'dbo.SP_MOBILE_CREATE_PAYMENT', N'P') IS NOT NULL
     DROP PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT;
 GO
@@ -997,6 +1017,7 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT
     @LOCATIONID INT,
     @CUSTOMERID INT,
     @AMOUNT     NUMERIC(18,2),
+    @PAYMENTTYPE VARCHAR(20) = 'Cash',
     @CREATEUSER VARCHAR(50),
     @PAYMENTNO  VARCHAR(MAX) OUTPUT
 )
@@ -1021,8 +1042,8 @@ BEGIN
     SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
     IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
 
-    INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTDATE, CREATE_DATE, CREATE_USER)
-    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @CurrentDate, GETDATE(), @CREATEUSER);
+    INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTTYPE, PAYMENTDATE, CREATE_DATE, CREATE_USER)
+    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @CurrentDate, GETDATE(), @CREATEUSER);
 END
 GO
 

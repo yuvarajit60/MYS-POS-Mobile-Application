@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../core/current_date_provider.dart';
 import '../models/customer.dart';
+import '../models/payment_type.dart';
 import '../services/payment_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
@@ -22,6 +23,7 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
 
   Customer? _selectedCustomer;
+  String _selectedPaymentType = paymentTypes.first;
   bool _saving = false;
 
   @override
@@ -69,7 +71,11 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
 
     setState(() => _saving = true);
     try {
-      final result = await _paymentService.create(customerId: _selectedCustomer!.customerId, amount: amount);
+      final result = await _paymentService.create(
+        customerId: _selectedCustomer!.customerId,
+        amount: amount,
+        paymentType: _selectedPaymentType,
+      );
       if (!mounted) return;
       _showMessage('Payment saved: ${result.paymentNo}');
       Navigator.of(context).pop();
@@ -117,6 +123,14 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Amount Received', border: OutlineInputBorder(), prefixText: '₹ '),
+            ),
+            const SizedBox(height: 16),
+            Text('Payment Type', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: [for (final type in paymentTypes) ButtonSegment(value: type, label: Text(type))],
+              selected: {_selectedPaymentType},
+              onSelectionChanged: (selection) => setState(() => _selectedPaymentType = selection.first),
             ),
             const SizedBox(height: 16),
             InputDecorator(

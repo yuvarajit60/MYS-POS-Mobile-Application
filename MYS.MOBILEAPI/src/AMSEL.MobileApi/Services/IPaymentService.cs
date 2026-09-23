@@ -59,6 +59,7 @@ public class PaymentService : IPaymentService
         parameters.Add("@LOCATIONID", locationId);
         parameters.Add("@CUSTOMERID", request.CustomerId);
         parameters.Add("@AMOUNT", request.Amount);
+        parameters.Add("@PAYMENTTYPE", request.PaymentType);
         parameters.Add("@CREATEUSER", username);
         parameters.Add("@PAYMENTNO", dbType: DbType.String, direction: ParameterDirection.Output, size: -1);
 

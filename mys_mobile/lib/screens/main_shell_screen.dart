@@ -14,6 +14,7 @@ import 'manage_employees_screen.dart';
 import 'manage_products_screen.dart';
 import 'manage_sites_screen.dart';
 import 'manage_vehicle_mappings_screen.dart';
+import 'payment_report_screen.dart';
 import 'reports_screen.dart';
 import 'trip_entry_reports_screen.dart';
 import 'widgets/action_item.dart';
@@ -86,6 +87,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.account_balance_wallet_outlined,
           label: 'Customer Ledger',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LedgerReportScreen())),
+        ),
+        ActionItem(
+          icon: Icons.payments_outlined,
+          label: 'Payment Report',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaymentReportScreen())),
         ),
       ];
 

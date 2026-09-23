@@ -6,6 +6,7 @@ import '../models/delivery_detail.dart';
 import '../models/delivery_summary.dart';
 import '../models/ledger_entry.dart';
 import '../models/order_detail.dart';
+import '../models/payment_report_entry.dart';
 import '../models/sales_order_summary.dart';
 import '../models/trip_entry_detail.dart';
 import '../models/trip_entry_line.dart';
@@ -559,6 +560,67 @@ class ReportPdfBuilder {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<pw.Document> buildPaymentReportSummary({
+    required List<PaymentReportEntry> rows,
+    required Company? company,
+    required String? customerName,
+    required String? paymentType,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final doc = pw.Document();
+    final total = rows.fold<double>(0, (sum, r) => sum + r.amount);
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _companyHeader(company),
+            pw.SizedBox(height: 10),
+            pw.Text('Payment Report', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Period: ${_dateFormat.format(fromDate)} to ${_dateFormat.format(toDate)}'
+              '${customerName != null ? '   |   Customer: $customerName' : '   |   All Customers'}'
+              '${paymentType != null ? '   |   Type: $paymentType' : ''}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.Divider(),
+          ],
+        ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Payment No', 'Customer', 'Date', 'Type', 'Amount'],
+            data: rows
+                .map((r) => [
+                      r.paymentNo,
+                      r.customerName,
+                      _dateFormat.format(r.paymentDate),
+                      r.paymentType,
+                      _amountFormat.format(r.amount),
+                    ])
+                .toList(),
+            cellAlignments: {4: pw.Alignment.centerRight},
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Total Amount: ${_amountFormat.format(total)}',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
           ),
         ],
       ),
