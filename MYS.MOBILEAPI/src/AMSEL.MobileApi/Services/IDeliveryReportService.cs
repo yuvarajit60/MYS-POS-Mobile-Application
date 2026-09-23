@@ -6,7 +6,7 @@ namespace AMSEL.MobileApi.Services;
 
 public interface IDeliveryReportService
 {
-    Task<IReadOnlyList<DeliverySummaryDto>> GetSummaryAsync(int locationId, int? customerId, string? deliveryNo, DateTime fromDate, DateTime toDate);
+    Task<IReadOnlyList<DeliverySummaryDto>> GetSummaryAsync(int locationId, int? customerId, int? driverId, string? deliveryNo, DateTime fromDate, DateTime toDate);
     Task<DeliveryDetailDto?> GetDeliveryDetailAsync(int locationId, string deliveryNo);
     Task<IReadOnlyList<DeliveryNumberDto>> SearchDeliveryNumbersAsync(int locationId, string? search);
 }
@@ -28,7 +28,7 @@ public class DeliveryReportService : IDeliveryReportService
     }
 
     public async Task<IReadOnlyList<DeliverySummaryDto>> GetSummaryAsync(
-        int locationId, int? customerId, string? deliveryNo, DateTime fromDate, DateTime toDate)
+        int locationId, int? customerId, int? driverId, string? deliveryNo, DateTime fromDate, DateTime toDate)
     {
         using var connection = _connectionFactory.CreateConnection();
         var like = $"%{deliveryNo}%";
@@ -44,6 +44,7 @@ public class DeliveryReportService : IDeliveryReportService
             WHERE SO.LOCATIONID = @LocationId
               AND CAST(DD.DELIVERDATE AS DATE) BETWEEN @FromDate AND @ToDate
               AND (@CustomerId IS NULL OR SO.CUSTOMERID = @CustomerId)
+              AND (@DriverId IS NULL OR DD.DRIVERID = @DriverId)
               AND (@DeliveryNo IS NULL OR DD.DELIVERYNO LIKE @Like)
             GROUP BY DD.DELIVERYNO
             ORDER BY MIN(DD.DELIVERDATE) DESC
@@ -52,6 +53,7 @@ public class DeliveryReportService : IDeliveryReportService
             {
                 LocationId = locationId,
                 CustomerId = customerId,
+                DriverId = driverId,
                 DeliveryNo = deliveryNo,
                 Like = like,
                 FromDate = fromDate.Date,

@@ -20,9 +20,9 @@ public class TripEntryReportsController : ControllerBase
 
     [HttpGet("summary")]
     public async Task<ActionResult<IReadOnlyList<TripEntrySummaryDto>>> Summary(
-        [FromQuery] int? customerId, [FromQuery] string? tripEntryNo,
+        [FromQuery] int? customerId, [FromQuery] int? driverId, [FromQuery] string? tripEntryNo,
         [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate)
-        => Ok(await _tripEntryReportService.GetSummaryAsync(User.GetLocationId(), customerId, tripEntryNo, fromDate, toDate));
+        => Ok(await _tripEntryReportService.GetSummaryAsync(User.GetLocationId(), customerId, driverId, tripEntryNo, fromDate, toDate));
 
     // Drill-down from a Summary row: full header + line items for one trip entry.
     [HttpGet("{tripEntryId:int}")]

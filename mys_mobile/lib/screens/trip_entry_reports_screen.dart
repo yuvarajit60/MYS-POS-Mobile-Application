@@ -4,9 +4,11 @@ import 'package:printing/printing.dart';
 import '../core/company_provider.dart';
 import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
+import '../models/driver.dart';
 import '../models/trip_entry_number.dart';
 import '../models/trip_entry_summary.dart';
 import '../services/customer_service.dart';
+import '../services/employee_service.dart';
 import '../services/trip_entry_report_service.dart';
 import 'trip_entry_detail_screen.dart';
 import 'trip_entry_graph_screen.dart';
@@ -21,10 +23,12 @@ class TripEntryReportsScreen extends StatefulWidget {
 
 class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
   final _customerService = CustomerService();
+  final _employeeService = EmployeeService();
   final _reportService = TripEntryReportService();
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
 
   Customer? _selectedCustomer;
+  Driver? _selectedDriver;
   TripEntryNumber? _selectedEntryNumber;
   DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _toDate = DateTime.now();
@@ -64,6 +68,17 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
     if (customer != null) setState(() => _selectedCustomer = customer);
   }
 
+  Future<void> _pickDriver() async {
+    final driver = await showSearchPicker<Driver>(
+      context: context,
+      title: 'Search driver (leave blank for all)',
+      search: _employeeService.searchDrivers,
+      itemLabel: (d) => d.employeeName,
+      itemSubtitle: (d) => d.mobileNo,
+    );
+    if (driver != null) setState(() => _selectedDriver = driver);
+  }
+
   Future<void> _pickDate({required bool isFrom}) async {
     final picked = await showDatePicker(
       context: context,
@@ -83,6 +98,7 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
     try {
       final rows = await _reportService.getSummary(
         customerId: _selectedCustomer?.customerId,
+        driverId: _selectedDriver?.employeeId,
         tripEntryNo: _selectedEntryNumber?.entryNo,
         fromDate: _fromDate,
         toDate: _toDate,
@@ -159,6 +175,23 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
                               ),
                       ),
                       child: Text(_selectedCustomer?.customerName ?? 'All Customers'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: _pickDriver,
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: 'Driver',
+                        suffixIcon: _selectedDriver == null
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => setState(() => _selectedDriver = null),
+                              ),
+                      ),
+                      child: Text(_selectedDriver?.employeeName ?? 'All Drivers'),
                     ),
                   ),
                   const SizedBox(height: 16),

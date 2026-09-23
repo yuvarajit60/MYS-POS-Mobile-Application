@@ -20,9 +20,9 @@ public class DeliveryReportsController : ControllerBase
 
     [HttpGet("summary")]
     public async Task<ActionResult<IReadOnlyList<DeliverySummaryDto>>> Summary(
-        [FromQuery] int? customerId, [FromQuery] string? deliveryNo,
+        [FromQuery] int? customerId, [FromQuery] int? driverId, [FromQuery] string? deliveryNo,
         [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate)
-        => Ok(await _deliveryReportService.GetSummaryAsync(User.GetLocationId(), customerId, deliveryNo, fromDate, toDate));
+        => Ok(await _deliveryReportService.GetSummaryAsync(User.GetLocationId(), customerId, driverId, deliveryNo, fromDate, toDate));
 
     // DeliveryNo is passed as a query param (not a path segment) because it
     // contains slashes (e.g. "DLV/25-26/0001") which would otherwise clash

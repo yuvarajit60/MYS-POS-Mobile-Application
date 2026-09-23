@@ -16,6 +16,7 @@ class TripEntryReportService {
 
   Future<List<TripEntrySummary>> getSummary({
     int? customerId,
+    int? driverId,
     String? tripEntryNo,
     required DateTime fromDate,
     required DateTime toDate,
@@ -23,6 +24,7 @@ class TripEntryReportService {
     try {
       final response = await ApiClient.instance.dio.get('/api/reports/trip-entries/summary', queryParameters: {
         'customerId': ?customerId,
+        'driverId': ?driverId,
         'tripEntryNo': ?(tripEntryNo?.isEmpty == true ? null : tripEntryNo),
         'fromDate': _dateFormat.format(fromDate),
         'toDate': _dateFormat.format(toDate),

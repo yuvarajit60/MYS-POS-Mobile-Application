@@ -15,6 +15,7 @@ class DeliveryReportService {
 
   Future<List<DeliverySummary>> getSummary({
     int? customerId,
+    int? driverId,
     String? deliveryNo,
     required DateTime fromDate,
     required DateTime toDate,
@@ -22,6 +23,7 @@ class DeliveryReportService {
     try {
       final response = await ApiClient.instance.dio.get('/api/reports/deliveries/summary', queryParameters: {
         'customerId': ?customerId,
+        'driverId': ?driverId,
         'deliveryNo': ?(deliveryNo?.isEmpty == true ? null : deliveryNo),
         'fromDate': _dateFormat.format(fromDate),
         'toDate': _dateFormat.format(toDate),

@@ -6,8 +6,10 @@ import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
 import '../models/delivery_number.dart';
 import '../models/delivery_summary.dart';
+import '../models/driver.dart';
 import '../services/customer_service.dart';
 import '../services/delivery_report_service.dart';
+import '../services/employee_service.dart';
 import 'delivery_detail_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 
@@ -23,10 +25,12 @@ class DeliveryReportsScreen extends StatefulWidget {
 
 class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
   final _customerService = CustomerService();
+  final _employeeService = EmployeeService();
   final _reportService = DeliveryReportService();
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
 
   Customer? _selectedCustomer;
+  Driver? _selectedDriver;
   DeliveryNumber? _selectedDeliveryNumber;
   DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _toDate = DateTime.now();
@@ -64,6 +68,17 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
     if (customer != null) setState(() => _selectedCustomer = customer);
   }
 
+  Future<void> _pickDriver() async {
+    final driver = await showSearchPicker<Driver>(
+      context: context,
+      title: 'Search driver (leave blank for all)',
+      search: _employeeService.searchDrivers,
+      itemLabel: (d) => d.employeeName,
+      itemSubtitle: (d) => d.mobileNo,
+    );
+    if (driver != null) setState(() => _selectedDriver = driver);
+  }
+
   Future<void> _pickDate({required bool isFrom}) async {
     final picked = await showDatePicker(
       context: context,
@@ -83,6 +98,7 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
     try {
       final rows = await _reportService.getSummary(
         customerId: _selectedCustomer?.customerId,
+        driverId: _selectedDriver?.employeeId,
         deliveryNo: _selectedDeliveryNumber?.deliveryNo,
         fromDate: _fromDate,
         toDate: _toDate,
@@ -150,6 +166,23 @@ class _DeliveryReportsScreenState extends State<DeliveryReportsScreen> {
                               ),
                       ),
                       child: Text(_selectedCustomer?.customerName ?? 'All Customers'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: _pickDriver,
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: 'Driver',
+                        suffixIcon: _selectedDriver == null
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => setState(() => _selectedDriver = null),
+                              ),
+                      ),
+                      child: Text(_selectedDriver?.employeeName ?? 'All Drivers'),
                     ),
                   ),
                   const SizedBox(height: 16),

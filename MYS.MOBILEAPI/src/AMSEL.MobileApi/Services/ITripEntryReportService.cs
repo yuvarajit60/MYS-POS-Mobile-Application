@@ -6,7 +6,7 @@ namespace AMSEL.MobileApi.Services;
 
 public interface ITripEntryReportService
 {
-    Task<IReadOnlyList<TripEntrySummaryDto>> GetSummaryAsync(int locationId, int? customerId, string? tripEntryNo, DateTime fromDate, DateTime toDate);
+    Task<IReadOnlyList<TripEntrySummaryDto>> GetSummaryAsync(int locationId, int? customerId, int? driverId, string? tripEntryNo, DateTime fromDate, DateTime toDate);
     Task<TripEntryDetailDto?> GetTripEntryDetailAsync(int locationId, int tripEntryId);
     Task<IReadOnlyList<GraphDataPointDto>> GetGraphDataAsync(int locationId, string groupBy, int? year);
     Task<IReadOnlyList<TripEntryNumberDto>> SearchTripEntryNumbersAsync(int locationId, string? search);
@@ -31,7 +31,7 @@ public class TripEntryReportService : ITripEntryReportService
     }
 
     public async Task<IReadOnlyList<TripEntrySummaryDto>> GetSummaryAsync(
-        int locationId, int? customerId, string? tripEntryNo, DateTime fromDate, DateTime toDate)
+        int locationId, int? customerId, int? driverId, string? tripEntryNo, DateTime fromDate, DateTime toDate)
     {
         using var connection = _connectionFactory.CreateConnection();
         var like = $"%{tripEntryNo}%";
@@ -48,6 +48,7 @@ public class TripEntryReportService : ITripEntryReportService
               AND TE.CANCEL = 0
               AND CAST(TE.ENTRYDATE AS DATE) BETWEEN @FromDate AND @ToDate
               AND (@CustomerId IS NULL OR TE.CUSTOMERID = @CustomerId)
+              AND (@DriverId IS NULL OR TE.EMPLOYEEID = @DriverId)
               AND (@TripEntryNo IS NULL OR TE.ENTRYNO LIKE @Like)
             ORDER BY TE.ENTRYDATE DESC, TE.TRIPENTRYID DESC
             """,
@@ -55,6 +56,7 @@ public class TripEntryReportService : ITripEntryReportService
             {
                 LocationId = locationId,
                 CustomerId = customerId,
+                DriverId = driverId,
                 TripEntryNo = tripEntryNo,
                 Like = like,
                 FromDate = fromDate.Date,
