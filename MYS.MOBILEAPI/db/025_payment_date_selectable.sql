@@ -2,13 +2,13 @@
   Payment Entry's Payment Date becomes rep-selectable (a date picker in
   the app) instead of a fixed read-only value pulled from dbo.CHANGE_DATE.
 
-  SP_MOBILE_CREATE_PAYMENT gets a new @PAYMENTDATE parameter, trusted
-  from the client — same convention as TRIPENTRY.TRIPDATE, which has
-  always been exactly what the rep entered rather than derived
-  server-side. @PAYMENTDATE defaults to NULL, and when NULL the proc
-  falls back to dbo.CHANGE_DATE then GETDATE(), preserving the previous
-  behavior for any caller that doesn't pass it — so this is purely
-  additive and safe to run even before the app is updated.
+  SP_MOBILE_CREATE_PAYMENT gets a new required @PAYMENTDATE parameter,
+  always trusted from the client with no dbo.CHANGE_DATE/GETDATE()
+  fallback — same convention as TRIPENTRY.TRIPDATE, which has always
+  been exactly what the rep entered rather than derived server-side.
+  The app always supplies this value (defaulting to the business date
+  in the picker, but editable), so a fallback would only ever mask a
+  client-side bug rather than serve a real caller.
 
   Idempotent — safe to re-run (DROP + CREATE PROCEDURE only; no table
   changes, since PAYMENT_DETAILS.PAYMENTDATE already exists and just
@@ -25,7 +25,7 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT
     @CUSTOMERID  INT,
     @AMOUNT      NUMERIC(18,2),
     @PAYMENTTYPE VARCHAR(20) = 'Cash',
-    @PAYMENTDATE DATETIME = NULL,
+    @PAYMENTDATE DATETIME,
     @CREATEUSER  VARCHAR(50),
     @PAYMENTNO   VARCHAR(MAX) OUTPUT
 )
@@ -46,18 +46,10 @@ BEGIN
          @USERSHORTNAME = '',
          @LOCATIONID = @LOCATIONID;
 
-    -- PAYMENTDATE is rep-selectable (the app's Payment Date picker) —
-    -- @PAYMENTDATE is trusted from the client, same as TRIPENTRY.TRIPDATE.
-    -- Falls back to dbo.CHANGE_DATE, then GETDATE(), only if the caller
-    -- doesn't supply one (keeps older callers working unchanged).
-    DECLARE @CurrentDate DATETIME = @PAYMENTDATE;
-    IF @CurrentDate IS NULL
-    BEGIN
-        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
-    END
-
+    -- PAYMENTDATE is always the app's Payment Date picker value — trusted
+    -- from the client with no CHANGE_DATE/GETDATE() fallback, same as
+    -- TRIPENTRY.TRIPDATE.
     INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTTYPE, PAYMENTDATE, CREATE_DATE, CREATE_USER)
-    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @CurrentDate, GETDATE(), @CREATEUSER);
+    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @PAYMENTDATE, GETDATE(), @CREATEUSER);
 END
 GO

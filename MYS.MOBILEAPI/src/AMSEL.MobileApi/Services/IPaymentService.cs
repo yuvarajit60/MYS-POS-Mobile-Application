@@ -17,9 +17,9 @@ public interface IPaymentService
 /// DELIVERY_DETAILS rows (see SearchDeliveredCustomersAsync), not every
 /// customer, since a payment only makes sense against delivered value.
 /// Writes go through SP_MOBILE_CREATE_PAYMENT. PaymentDate is
-/// rep-selectable (see 025_payment_date_selectable.sql) — trusted from
-/// the client, same convention as TRIPENTRY.TRIPDATE — falling back to
-/// dbo.CHANGE_DATE then GETDATE() only if the request doesn't supply one.
+/// rep-selectable (see 025_payment_date_selectable.sql) — always
+/// trusted from the client with no dbo.CHANGE_DATE/GETDATE() fallback,
+/// same convention as TRIPENTRY.TRIPDATE.
 /// </summary>
 public class PaymentService : IPaymentService
 {

@@ -89,11 +89,11 @@
   Transfer) and is now saved by SP_MOBILE_CREATE_PAYMENT.
 
   Also folds in 025_payment_date_selectable.sql (see that file's header):
-  SP_MOBILE_CREATE_PAYMENT gets a new @PAYMENTDATE parameter — the
-  Payment Entry screen's Payment Date is now rep-selectable (a date
-  picker) rather than a fixed read-only value, same convention as
-  TRIPENTRY.TRIPDATE. Falls back to dbo.CHANGE_DATE then GETDATE() only
-  if the caller doesn't supply one.
+  SP_MOBILE_CREATE_PAYMENT gets a new required @PAYMENTDATE parameter —
+  the Payment Entry screen's Payment Date is now rep-selectable (a date
+  picker) rather than a fixed read-only value, always trusted from the
+  client with no dbo.CHANGE_DATE/GETDATE() fallback, same convention as
+  TRIPENTRY.TRIPDATE.
 
   Also folds in 020_salesorder_discount.sql (see that file's header):
   dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
@@ -1025,7 +1025,7 @@ CREATE PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT
     @CUSTOMERID  INT,
     @AMOUNT      NUMERIC(18,2),
     @PAYMENTTYPE VARCHAR(20) = 'Cash',
-    @PAYMENTDATE DATETIME = NULL,
+    @PAYMENTDATE DATETIME,
     @CREATEUSER  VARCHAR(50),
     @PAYMENTNO   VARCHAR(MAX) OUTPUT
 )
@@ -1046,19 +1046,11 @@ BEGIN
          @USERSHORTNAME = '',
          @LOCATIONID = @LOCATIONID;
 
-    -- PAYMENTDATE is rep-selectable (the app's Payment Date picker) —
-    -- @PAYMENTDATE is trusted from the client, same as TRIPENTRY.TRIPDATE.
-    -- Falls back to dbo.CHANGE_DATE, then GETDATE(), only if the caller
-    -- doesn't supply one (keeps older callers working unchanged).
-    DECLARE @CurrentDate DATETIME = @PAYMENTDATE;
-    IF @CurrentDate IS NULL
-    BEGIN
-        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
-    END
-
+    -- PAYMENTDATE is always the app's Payment Date picker value — trusted
+    -- from the client with no CHANGE_DATE/GETDATE() fallback, same as
+    -- TRIPENTRY.TRIPDATE.
     INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTTYPE, PAYMENTDATE, CREATE_DATE, CREATE_USER)
-    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @CurrentDate, GETDATE(), @CREATEUSER);
+    VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @PAYMENTDATE, GETDATE(), @CREATEUSER);
 END
 GO
 
