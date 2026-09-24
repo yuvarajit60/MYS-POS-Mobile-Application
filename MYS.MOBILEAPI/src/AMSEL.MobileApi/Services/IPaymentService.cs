@@ -16,9 +16,10 @@ public interface IPaymentService
 /// goods. Customer selection is restricted to customers who have actual
 /// DELIVERY_DETAILS rows (see SearchDeliveredCustomersAsync), not every
 /// customer, since a payment only makes sense against delivered value.
-/// Writes go through SP_MOBILE_CREATE_PAYMENT (see 017_payment_details.sql)
-/// which stamps PAYMENTDATE from dbo.CHANGE_DATE, same as every other
-/// Entry's date column.
+/// Writes go through SP_MOBILE_CREATE_PAYMENT. PaymentDate is
+/// rep-selectable (see 025_payment_date_selectable.sql) — trusted from
+/// the client, same convention as TRIPENTRY.TRIPDATE — falling back to
+/// dbo.CHANGE_DATE then GETDATE() only if the request doesn't supply one.
 /// </summary>
 public class PaymentService : IPaymentService
 {
@@ -60,6 +61,7 @@ public class PaymentService : IPaymentService
         parameters.Add("@CUSTOMERID", request.CustomerId);
         parameters.Add("@AMOUNT", request.Amount);
         parameters.Add("@PAYMENTTYPE", request.PaymentType);
+        parameters.Add("@PAYMENTDATE", request.PaymentDate);
         parameters.Add("@CREATEUSER", username);
         parameters.Add("@PAYMENTNO", dbType: DbType.String, direction: ParameterDirection.Output, size: -1);
 

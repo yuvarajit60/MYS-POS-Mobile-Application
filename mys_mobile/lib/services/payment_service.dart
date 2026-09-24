@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import '../core/api_client.dart';
 import '../models/customer.dart';
 
@@ -13,17 +14,25 @@ class PaymentResult {
 }
 
 class PaymentService {
+  static final _dateFormat = DateFormat('yyyy-MM-dd');
+
   Future<List<Customer>> searchDeliveredCustomers(String query) async {
     final response = await ApiClient.instance.dio.get('/api/payments/delivered-customers', queryParameters: {'search': query});
     return (response.data as List).map((e) => Customer.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<PaymentResult> create({required int customerId, required double amount, required String paymentType}) async {
+  Future<PaymentResult> create({
+    required int customerId,
+    required double amount,
+    required String paymentType,
+    required DateTime paymentDate,
+  }) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/payments', data: {
         'customerId': customerId,
         'amount': amount,
         'paymentType': paymentType,
+        'paymentDate': _dateFormat.format(paymentDate),
       });
       final data = response.data as Map<String, dynamic>;
       return PaymentResult(paymentNo: data['paymentNo'] as String);

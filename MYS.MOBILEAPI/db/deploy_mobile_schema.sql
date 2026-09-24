@@ -88,6 +88,13 @@
   the Payment Entry screen's new Payment Type selector (Cash/UPI/Acc
   Transfer) and is now saved by SP_MOBILE_CREATE_PAYMENT.
 
+  Also folds in 025_payment_date_selectable.sql (see that file's header):
+  SP_MOBILE_CREATE_PAYMENT gets a new @PAYMENTDATE parameter — the
+  Payment Entry screen's Payment Date is now rep-selectable (a date
+  picker) rather than a fixed read-only value, same convention as
+  TRIPENTRY.TRIPDATE. Falls back to dbo.CHANGE_DATE then GETDATE() only
+  if the caller doesn't supply one.
+
   Also folds in 020_salesorder_discount.sql (see that file's header):
   dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
   flat, tax-exclusive, per-line amount from the Sales Order screen's new
@@ -1014,12 +1021,13 @@ GO
 
 CREATE PROCEDURE dbo.SP_MOBILE_CREATE_PAYMENT
 (
-    @LOCATIONID INT,
-    @CUSTOMERID INT,
-    @AMOUNT     NUMERIC(18,2),
+    @LOCATIONID  INT,
+    @CUSTOMERID  INT,
+    @AMOUNT      NUMERIC(18,2),
     @PAYMENTTYPE VARCHAR(20) = 'Cash',
-    @CREATEUSER VARCHAR(50),
-    @PAYMENTNO  VARCHAR(MAX) OUTPUT
+    @PAYMENTDATE DATETIME = NULL,
+    @CREATEUSER  VARCHAR(50),
+    @PAYMENTNO   VARCHAR(MAX) OUTPUT
 )
 AS
 BEGIN
@@ -1038,9 +1046,16 @@ BEGIN
          @USERSHORTNAME = '',
          @LOCATIONID = @LOCATIONID;
 
-    DECLARE @CurrentDate DATETIME;
-    SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
-    IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+    -- PAYMENTDATE is rep-selectable (the app's Payment Date picker) —
+    -- @PAYMENTDATE is trusted from the client, same as TRIPENTRY.TRIPDATE.
+    -- Falls back to dbo.CHANGE_DATE, then GETDATE(), only if the caller
+    -- doesn't supply one (keeps older callers working unchanged).
+    DECLARE @CurrentDate DATETIME = @PAYMENTDATE;
+    IF @CurrentDate IS NULL
+    BEGIN
+        SELECT TOP 1 @CurrentDate = CURRENTDATE FROM dbo.CHANGE_DATE;
+        IF @CurrentDate IS NULL SET @CurrentDate = GETDATE();
+    END
 
     INSERT INTO dbo.PAYMENT_DETAILS (PAYMENTNO, LOCATIONID, CUSTOMERID, AMOUNT, PAYMENTTYPE, PAYMENTDATE, CREATE_DATE, CREATE_USER)
     VALUES (@PAYMENTNO, @LOCATIONID, @CUSTOMERID, @AMOUNT, @PAYMENTTYPE, @CurrentDate, GETDATE(), @CREATEUSER);

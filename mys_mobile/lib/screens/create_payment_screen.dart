@@ -24,14 +24,27 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
 
   Customer? _selectedCustomer;
   String _selectedPaymentType = paymentTypes.first;
+  DateTime? _paymentDate;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     CurrentDateProvider.instance.ensureLoaded().then((_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() => _paymentDate ??= CurrentDateProvider.instance.currentDate);
     });
+  }
+
+  Future<void> _pickPaymentDate() async {
+    final initial = _paymentDate ?? CurrentDateProvider.instance.currentDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(initial.year - 1),
+      lastDate: DateTime(initial.year + 1),
+    );
+    if (picked != null) setState(() => _paymentDate = picked);
   }
 
   Future<void> _pickCustomer() async {
@@ -75,6 +88,7 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
         customerId: _selectedCustomer!.customerId,
         amount: amount,
         paymentType: _selectedPaymentType,
+        paymentDate: _paymentDate ?? CurrentDateProvider.instance.currentDate,
       );
       if (!mounted) return;
       _showMessage('Payment saved: ${result.paymentNo}');
@@ -133,9 +147,12 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
               onSelectionChanged: (selection) => setState(() => _selectedPaymentType = selection.first),
             ),
             const SizedBox(height: 16),
-            InputDecorator(
-              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Payment Date'),
-              child: Text(_dateFormat.format(CurrentDateProvider.instance.currentDate)),
+            InkWell(
+              onTap: _pickPaymentDate,
+              child: InputDecorator(
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Payment Date'),
+                child: Text(_dateFormat.format(_paymentDate ?? CurrentDateProvider.instance.currentDate)),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton(
