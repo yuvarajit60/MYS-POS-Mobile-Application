@@ -63,7 +63,7 @@ public class DeliveryService : IDeliveryService
             LEFT JOIN PRODUCT PR ON PR.PRODUCTID = SOD.PRODUCTID
             WHERE SO.CUSTOMERID = @CustomerId AND SO.LOCATIONID = @LocationId AND SO.CANCEL = 0
               AND (SOD.SALESQTY - SOD.DELIVERYQTY) > 0
-            ORDER BY SO.ENTRYDATE, SO.ENTRYNO, SOD.SALESORDERDETID
+            ORDER BY SO.ENTRYDATE DESC, SO.ENTRYNO DESC, SOD.SALESORDERDETID
             """,
             new { CustomerId = customerId, LocationId = locationId });
 
