@@ -1,4 +1,12 @@
 /*
+  SUPERSEDED for db_ams_erp and DB_AMS_ERP_SMS: both were restructured
+  manually (original dbo.SITE renamed aside to dbo.SITEOLD, a fresh
+  new-shape dbo.SITE created) before this script was run there, so its
+  in-place ALTER TABLE / column-drop approach below no longer applies —
+  run 027_migrate_siteold_to_site_and_mapping.sql instead. Left as-is here
+  since its logic is still correct for any database that keeps its
+  original dbo.SITE and only needs the old columns dropped in place.
+
   Splits dbo.SITE into two tables (matching the split already made on the
   sandbox, db_ams_pos_test):
     - dbo.SITE keeps only site master data — SITENAME + AREAID. City is no
