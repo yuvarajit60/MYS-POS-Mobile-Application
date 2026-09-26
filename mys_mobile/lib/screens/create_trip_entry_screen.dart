@@ -4,12 +4,15 @@ import '../models/driver.dart';
 import '../models/driver_vehicle.dart';
 import '../models/product.dart';
 import '../models/site.dart';
+import '../models/site_detail.dart';
 import '../models/trip_entry_line.dart';
 import '../services/customer_service.dart';
 import '../services/employee_service.dart';
 import '../services/product_service.dart';
 import '../services/site_service.dart';
 import '../services/trip_entry_service.dart';
+import 'customer_form_screen.dart';
+import 'site_form_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 import 'widgets/trip_entry_line_items_grid.dart';
 
@@ -19,11 +22,15 @@ import 'widgets/trip_entry_line_items_grid.dart';
 /// it's implicit from the logged-in user's own LOCATIONID, not a free
 /// cross-location dropdown as on the desktop screen this mirrors.
 ///
-/// Customer is normally derived from the picked Site's Customer Site
-/// Mapping (SITE.CUSTOMERID). Sites created in the standalone "Site" master
-/// have no mapping yet, so when the picked site's customerId is null, the
-/// Customer field switches to a manual picker sourced from the Customer
-/// table instead of staying auto-filled/read-only.
+/// Selection order is Driver -> Customer -> Site, matching Sales Order/
+/// Delivery Entry. Site search prefers sites already mapped to the
+/// selected customer, but also allows any other existing site (a site can
+/// be reused across different customers over time, unlike Sales Order/
+/// Delivery which only ever search this customer's own sites). Picking a
+/// site that isn't already mapped to the selected customer is a new
+/// Customer + Site combination, so it's recorded into SITE_MAPPING via
+/// SiteService.assignCustomer before use — same as "Add New Site"/
+/// "Add New Customer" already do for brand-new records.
 class CreateTripEntryScreen extends StatefulWidget {
   const CreateTripEntryScreen({super.key});
 
@@ -76,28 +83,6 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
     });
   }
 
-  Future<void> _pickSite() async {
-    final site = await showSearchPicker<Site>(
-      context: context,
-      title: 'Search site',
-      search: _siteService.search,
-      itemLabel: (s) => s.siteName,
-      itemSubtitle: (s) => '${s.customerName} • ${s.areaName}',
-    );
-    if (site == null) return;
-
-    setState(() {
-      _selectedSite = site;
-      _selectedCustomer = site.customerId == null
-          ? null
-          : Customer(
-              customerId: site.customerId!,
-              customerName: site.customerName ?? '',
-              mobileNo: site.mobileNo,
-            );
-    });
-  }
-
   Future<void> _pickCustomer() async {
     final customer = await showSearchPicker<Customer>(
       context: context,
@@ -105,9 +90,89 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
       search: _customerService.search,
       itemLabel: (c) => c.customerName,
       itemSubtitle: (c) => c.mobileNo,
+      addNewLabel: 'Add New Customer',
+      onAddNew: (context) => Navigator.of(context).push<Customer>(
+        MaterialPageRoute(builder: (_) => const CustomerFormScreen()),
+      ),
     );
-    if (customer != null) setState(() => _selectedCustomer = customer);
+    if (customer == null) return;
+    setState(() {
+      _selectedCustomer = customer;
+      _selectedSite = null;
+    });
   }
+
+  /// Sites already mapped to the selected customer come first, followed by
+  /// every other existing site (deduplicated) — a site not yet linked to
+  /// this customer is still pickable, since sites get reused across jobs
+  /// for different customers rather than belonging to one forever.
+  Future<List<Site>> _searchSitesForCustomer(String query) async {
+    final results = await Future.wait([
+      _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      _siteService.search(query),
+    ]);
+    final mapped = results[0];
+    final all = results[1];
+    final mappedIds = mapped.map((s) => s.siteId).toSet();
+    return [...mapped, ...all.where((s) => !mappedIds.contains(s.siteId))];
+  }
+
+  Future<void> _pickSite() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+
+    final site = await showSearchPicker<Site>(
+      context: context,
+      title: 'Search site',
+      search: _searchSitesForCustomer,
+      itemLabel: (s) => s.siteName,
+      itemSubtitle: (s) =>
+          s.customerId == _selectedCustomer!.customerId ? s.areaName : '${s.customerName ?? 'Not mapped'} • ${s.areaName}',
+      addNewLabel: 'Add New Site',
+      onAddNew: (context) async {
+        final detail = await Navigator.of(context).push<SiteDetail>(
+          MaterialPageRoute(builder: (_) => const SiteFormScreen()),
+        );
+        if (detail == null) return null;
+        // Site master creates bare (unmapped) sites; map it to the
+        // customer already selected here so it's immediately usable.
+        final mapped = await _siteService.assignCustomer(
+          siteId: detail.siteId,
+          customerId: _selectedCustomer!.customerId,
+        );
+        return _siteFromDetail(mapped);
+      },
+    );
+    if (site == null) return;
+
+    if (site.customerId == _selectedCustomer!.customerId) {
+      setState(() => _selectedSite = site);
+      return;
+    }
+
+    // New Customer + Site combination (the site was unmapped, or mapped to
+    // a different customer) — record it in SITE_MAPPING before using it.
+    try {
+      final mapped = await _siteService.assignCustomer(
+        siteId: site.siteId,
+        customerId: _selectedCustomer!.customerId,
+      );
+      setState(() => _selectedSite = _siteFromDetail(mapped));
+    } on SiteServiceException catch (e) {
+      _showMessage(e.message);
+    }
+  }
+
+  Site _siteFromDetail(SiteDetail detail) => Site(
+        siteId: detail.siteId,
+        siteName: detail.siteName,
+        areaName: detail.areaName,
+        customerId: detail.customerId,
+        customerName: detail.customerName,
+        mobileNo: _selectedCustomer?.mobileNo ?? '',
+      );
 
   Future<void> _pickTripDate() async {
     final picked = await showDatePicker(
@@ -222,16 +287,16 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   void _onDeleteLine(int index) => setState(() => _lines.removeAt(index));
 
   Future<void> _saveAndClose() async {
-    if (_selectedSite == null) {
-      _showMessage('Select a site.');
+    if (_selectedDriver == null) {
+      _showMessage('Select a driver.');
       return;
     }
     if (_selectedCustomer == null) {
       _showMessage('Select a customer.');
       return;
     }
-    if (_selectedDriver == null) {
-      _showMessage('Select a driver.');
+    if (_selectedSite == null) {
+      _showMessage('Select a site.');
       return;
     }
     if (_tripNoController.text.trim().isEmpty) {
@@ -296,31 +361,26 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
               Text('Vehicle: ${_driverVehicle!.vehicleName}', style: Theme.of(context).textTheme.bodySmall),
             ],
             const SizedBox(height: 16),
+            Text('Customer', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickCustomer,
+              child: InputDecorator(
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer'),
+                child: Text(
+                  _selectedCustomer == null ? 'Tap to select a customer' : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Text('Site', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             InkWell(
               onTap: _pickSite,
               child: InputDecorator(
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Site Name'),
-                child: Text(_selectedSite == null ? 'Tap to select a site' : _selectedSite!.siteName),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Auto-filled from the site's Customer Site Mapping when
-            // present (read-only). Sites with no mapping leave this
-            // tappable so the rep can pick a customer manually.
-            InkWell(
-              onTap: (_selectedSite != null && _selectedSite!.customerId == null) ? _pickCustomer : null,
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  labelText: 'Customer',
-                  helperText: (_selectedSite != null && _selectedSite!.customerId == null) ? 'Not mapped to a site — select manually' : null,
-                ),
                 child: Text(
-                  _selectedCustomer == null
-                      ? (_selectedSite == null ? 'Select a site first' : 'Tap to select a customer')
-                      : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+                  _selectedSite == null ? (_selectedCustomer == null ? 'Select a customer first' : 'Tap to select a site') : _selectedSite!.siteName,
                 ),
               ),
             ),
