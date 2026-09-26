@@ -95,15 +95,21 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       addNewLabel: 'Add New Site',
       onAddNew: (context) async {
         final detail = await Navigator.of(context).push<SiteDetail>(
-          MaterialPageRoute(builder: (_) => SiteFormScreen(initialCustomer: _selectedCustomer)),
+          MaterialPageRoute(builder: (_) => const SiteFormScreen()),
         );
         if (detail == null) return null;
-        return Site(
+        // Site master creates bare (unmapped) sites; map it to the
+        // customer already selected here so it's immediately usable.
+        final mapped = await _siteService.assignCustomer(
           siteId: detail.siteId,
-          siteName: detail.siteName,
-          areaName: detail.areaName,
-          customerId: detail.customerId,
-          customerName: detail.customerName,
+          customerId: _selectedCustomer!.customerId,
+        );
+        return Site(
+          siteId: mapped.siteId,
+          siteName: mapped.siteName,
+          areaName: mapped.areaName,
+          customerId: mapped.customerId,
+          customerName: mapped.customerName,
           mobileNo: _selectedCustomer!.mobileNo,
         );
       },

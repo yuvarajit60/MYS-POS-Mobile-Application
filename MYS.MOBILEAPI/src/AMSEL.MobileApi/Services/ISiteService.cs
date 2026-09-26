@@ -10,22 +10,26 @@ public interface ISiteService
     Task<SiteDetailDto?> GetByIdAsync(int siteId);
     Task<SiteDetailDto> CreateAsync(CreateSiteRequest request, int locationId, int userId, int employeeId);
     Task<SiteDetailDto> UpdateAsync(int siteId, UpdateSiteRequest request, int locationId, int userId, int employeeId);
+    Task<SiteDetailDto?> AssignCustomerAsync(int siteId, AssignSiteCustomerRequest request, int locationId, int userId, int employeeId);
     Task<bool> DeleteAsync(int siteId, int locationId, int userId, int employeeId);
 }
 
 public class DuplicateSiteNameException : Exception
 {
     public DuplicateSiteNameException(string siteName)
-        : base($"A site named \"{siteName}\" already exists for this customer.") { }
+        : base($"A site named \"{siteName}\" already exists in this city.") { }
 }
 
 /// <summary>
-/// Searched by site name, optionally scoped to one customer — Trip Entry
-/// picks the site first with no customerId filter, then derives the
-/// customer from SITE.CUSTOMERID, rather than picking a customer first.
-/// Sales Order does the opposite (customer first, then its own sites only),
-/// so passes customerId. Manage Sites (this file's CRUD half) is the
-/// screen that actually maintains the site-to-customer mapping.
+/// SITE is shared by two masters: the "Site" master (this file's Create/
+/// Update/Delete) owns SiteName/Area/City only and never sets CustomerId —
+/// new sites are always created unmapped. "Customer Site Mapping" owns the
+/// SITE.CUSTOMERID column exclusively, via AssignCustomerAsync, and never
+/// touches Name/Area/City. CustomerId is nullable (a site can exist before
+/// anyone maps it to a customer), so Search/GetById LEFT JOIN CUSTOMER.
+/// Trip Entry picks the site first and derives the customer from
+/// SITE.CUSTOMERID when present, falling back to a manual customer picker
+/// when the site has no mapping.
 /// </summary>
 public class SiteService : ISiteService
 {
@@ -45,8 +49,8 @@ public class SiteService : ISiteService
             SELECT TOP 50 S.SITEID AS SiteId, ISNULL(S.SITENAME, '') AS SiteName, ISNULL(S.AREANAME, '') AS AreaName,
                    S.CUSTOMERID AS CustomerId, C.CUSTOMERNAME AS CustomerName, ISNULL(C.MOBILENO, '') AS MobileNo
             FROM SITE S
-            INNER JOIN CUSTOMER C ON C.CUSTOMERID = S.CUSTOMERID
-            WHERE S.STATUS = 1 AND C.STATUS = 1
+            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = S.CUSTOMERID AND C.STATUS = 1
+            WHERE S.STATUS = 1
               AND (@CustomerId IS NULL OR S.CUSTOMERID = @CustomerId)
               AND (@Search IS NULL OR S.SITENAME LIKE @Like)
             ORDER BY S.SITENAME
@@ -66,21 +70,21 @@ public class SiteService : ISiteService
                    S.CUSTOMERID AS CustomerId, C.CUSTOMERNAME AS CustomerName
             FROM SITE S
             LEFT JOIN CITY CI ON CI.CITYID = S.CITYID
-            INNER JOIN CUSTOMER C ON C.CUSTOMERID = S.CUSTOMERID
+            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = S.CUSTOMERID AND C.STATUS = 1
             WHERE S.SITEID = @SiteId AND S.STATUS = 1
             """,
             new { SiteId = siteId });
     }
 
-    private async Task<bool> NameExistsAsync(Microsoft.Data.SqlClient.SqlConnection connection, int customerId, string siteName, int? excludingSiteId, Microsoft.Data.SqlClient.SqlTransaction? transaction = null)
+    private async Task<bool> NameExistsAsync(Microsoft.Data.SqlClient.SqlConnection connection, int cityId, string siteName, int? excludingSiteId, Microsoft.Data.SqlClient.SqlTransaction? transaction = null)
     {
         var count = await connection.ExecuteScalarAsync<int>(
             """
             SELECT COUNT(*) FROM SITE
-            WHERE STATUS = 1 AND CUSTOMERID = @CustomerId AND SITENAME = @SiteName
+            WHERE STATUS = 1 AND CITYID = @CityId AND SITENAME = @SiteName
               AND (@ExcludingSiteId IS NULL OR SITEID <> @ExcludingSiteId)
             """,
-            new { CustomerId = customerId, SiteName = siteName, ExcludingSiteId = excludingSiteId },
+            new { CityId = cityId, SiteName = siteName, ExcludingSiteId = excludingSiteId },
             transaction);
 
         return count > 0;
@@ -92,7 +96,7 @@ public class SiteService : ISiteService
         await connection.OpenAsync();
         using var transaction = connection.BeginTransaction();
 
-        if (await NameExistsAsync(connection, request.CustomerId, request.SiteName, null, transaction))
+        if (await NameExistsAsync(connection, request.CityId, request.SiteName, null, transaction))
             throw new DuplicateSiteNameException(request.SiteName);
 
         var siteId = await connection.QuerySingleAsync<int>(
@@ -103,7 +107,7 @@ public class SiteService : ISiteService
                  USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID)
             OUTPUT INSERTED.SITEID
             VALUES
-                (@SiteName, @AreaName, @AreaId, @CityId, 1, @CustomerId,
+                (@SiteName, @AreaName, @AreaId, @CityId, 1, NULL,
                  @LocationId, @LocationId, @UserId, @UserId,
                  GETDATE(), GETDATE(), @EmployeeId, @EmployeeId)
             """,
@@ -113,7 +117,6 @@ public class SiteService : ISiteService
                 request.AreaName,
                 request.AreaId,
                 request.CityId,
-                request.CustomerId,
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
@@ -131,13 +134,13 @@ public class SiteService : ISiteService
         await connection.OpenAsync();
         using var transaction = connection.BeginTransaction();
 
-        if (await NameExistsAsync(connection, request.CustomerId, request.SiteName, siteId, transaction))
+        if (await NameExistsAsync(connection, request.CityId, request.SiteName, siteId, transaction))
             throw new DuplicateSiteNameException(request.SiteName);
 
         await connection.ExecuteAsync(
             """
             UPDATE SITE
-            SET SITENAME = @SiteName, AREANAME = @AreaName, AREAID = @AreaId, CITYID = @CityId, CUSTOMERID = @CustomerId,
+            SET SITENAME = @SiteName, AREANAME = @AreaName, AREAID = @AreaId, CITYID = @CityId,
                 MODIFYEDLOCATIONID = @LocationId, LASTMODIFYEDUSERID = @UserId,
                 LASTMODIFYEDDATE = GETDATE(), MODIFYEDEMPLOYEEID = @EmployeeId
             WHERE SITEID = @SiteId AND STATUS = 1
@@ -149,7 +152,6 @@ public class SiteService : ISiteService
                 request.AreaName,
                 request.AreaId,
                 request.CityId,
-                request.CustomerId,
                 LocationId = locationId,
                 UserId = userId,
                 EmployeeId = employeeId,
@@ -159,6 +161,25 @@ public class SiteService : ISiteService
         transaction.Commit();
 
         return (await GetByIdAsync(siteId))!;
+    }
+
+    /// <summary>Sets or clears (unmap, CustomerId = null) the Customer Site Mapping for an existing site. Never touches SiteName/Area/City.</summary>
+    public async Task<SiteDetailDto?> AssignCustomerAsync(int siteId, AssignSiteCustomerRequest request, int locationId, int userId, int employeeId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rowsAffected = await connection.ExecuteAsync(
+            """
+            UPDATE SITE
+            SET CUSTOMERID = @CustomerId,
+                MODIFYEDLOCATIONID = @LocationId, LASTMODIFYEDUSERID = @UserId,
+                LASTMODIFYEDDATE = GETDATE(), MODIFYEDEMPLOYEEID = @EmployeeId
+            WHERE SITEID = @SiteId AND STATUS = 1
+            """,
+            new { SiteId = siteId, request.CustomerId, LocationId = locationId, UserId = userId, EmployeeId = employeeId });
+
+        if (rowsAffected == 0) return null;
+
+        return await GetByIdAsync(siteId);
     }
 
     /// <summary>Soft delete (STATUS=0) — matches CUSTOMER/PRODUCT's convention; existing TRIPENTRY rows keep their own SITENAME snapshot, unaffected.</summary>

@@ -2,8 +2,8 @@ class Site {
   final int siteId;
   final String siteName;
   final String areaName;
-  final int customerId;
-  final String customerName;
+  final int? customerId;
+  final String? customerName;
   final String mobileNo;
 
   Site({
@@ -19,8 +19,8 @@ class Site {
         siteId: json['siteId'] as int,
         siteName: json['siteName'] as String? ?? '',
         areaName: json['areaName'] as String? ?? '',
-        customerId: json['customerId'] as int,
-        customerName: json['customerName'] as String? ?? '',
+        customerId: json['customerId'] as int?,
+        customerName: json['customerName'] as String?,
         mobileNo: json['mobileNo'] as String? ?? '',
       );
 }

@@ -2,16 +2,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/site.dart';
 import '../services/site_service.dart';
-import 'site_form_screen.dart';
+import 'customer_site_mapping_form_screen.dart';
 
-class ManageSitesScreen extends StatefulWidget {
-  const ManageSitesScreen({super.key});
+/// Lists sites with their current customer mapping (or "Not mapped") and
+/// lets the user add/change a mapping, or unmap a site back to no customer.
+/// Sites themselves are created/edited/deleted from the separate "Site"
+/// master (manage_sites_screen.dart) — this screen only edits SITE.CUSTOMERID.
+class ManageCustomerSiteMappingsScreen extends StatefulWidget {
+  const ManageCustomerSiteMappingsScreen({super.key});
 
   @override
-  State<ManageSitesScreen> createState() => _ManageSitesScreenState();
+  State<ManageCustomerSiteMappingsScreen> createState() => _ManageCustomerSiteMappingsScreenState();
 }
 
-class _ManageSitesScreenState extends State<ManageSitesScreen> {
+class _ManageCustomerSiteMappingsScreenState extends State<ManageCustomerSiteMappingsScreen> {
   final _siteService = SiteService();
   final _searchController = TextEditingController();
   Timer? _debounce;
@@ -54,36 +58,29 @@ class _ManageSitesScreenState extends State<ManageSitesScreen> {
 
   Future<void> _addNew() async {
     final result = await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SiteFormScreen()),
+      MaterialPageRoute(builder: (_) => const CustomerSiteMappingFormScreen()),
     );
     if (result != null) _runSearch(_searchController.text);
   }
 
   Future<void> _edit(Site site) async {
-    try {
-      final detail = await _siteService.getById(site.siteId);
-      if (!mounted) return;
-      final result = await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => SiteFormScreen(editing: detail)),
-      );
-      if (result != null) _runSearch(_searchController.text);
-    } on SiteServiceException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CustomerSiteMappingFormScreen(editing: site)),
+    );
+    if (result != null) _runSearch(_searchController.text);
   }
 
-  Future<void> _delete(Site site) async {
+  Future<void> _unmap(Site site) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete site?'),
-        content: Text('Delete "${site.siteName}"? This cannot be undone from the app.'),
+        title: const Text('Unmap site?'),
+        content: Text('Remove the mapping between "${site.siteName}" and "${site.customerName}"? The site itself is not deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Unmap', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -91,7 +88,7 @@ class _ManageSitesScreenState extends State<ManageSitesScreen> {
     if (confirmed != true) return;
 
     try {
-      await _siteService.delete(site.siteId);
+      await _siteService.assignCustomer(siteId: site.siteId, customerId: null);
       _runSearch(_searchController.text);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
@@ -102,7 +99,7 @@ class _ManageSitesScreenState extends State<ManageSitesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sites')),
+      appBar: AppBar(title: const Text('Customer Site Mapping')),
       floatingActionButton: FloatingActionButton(
         onPressed: _addNew,
         child: const Icon(Icons.add),
@@ -129,14 +126,18 @@ class _ManageSitesScreenState extends State<ManageSitesScreen> {
                     itemCount: _results.length,
                     itemBuilder: (context, index) {
                       final site = _results[index];
+                      final mapped = site.customerId != null;
                       return ListTile(
                         title: Text(site.siteName),
-                        subtitle: Text(site.areaName),
+                        subtitle: Text(mapped ? site.customerName! : 'Not mapped'),
                         onTap: () => _edit(site),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _delete(site),
-                        ),
+                        trailing: mapped
+                            ? IconButton(
+                                icon: const Icon(Icons.link_off, color: Colors.red),
+                                tooltip: 'Unmap',
+                                onPressed: () => _unmap(site),
+                              )
+                            : null,
                       );
                     },
                   ),

@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/area.dart';
 import '../models/city.dart';
-import '../models/customer.dart';
 import '../models/site.dart';
 import '../models/site_detail.dart';
 
@@ -33,7 +32,6 @@ class SiteService {
     required String siteName,
     required Area area,
     required City city,
-    required Customer customer,
   }) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/sites', data: {
@@ -41,7 +39,6 @@ class SiteService {
         'areaName': area.areaName,
         'areaId': area.areaId,
         'cityId': city.cityId,
-        'customerId': customer.customerId,
       });
       return SiteDetail.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -54,7 +51,6 @@ class SiteService {
     required String siteName,
     required Area area,
     required City city,
-    required Customer customer,
   }) async {
     try {
       final response = await ApiClient.instance.dio.put('/api/sites/$siteId', data: {
@@ -62,11 +58,23 @@ class SiteService {
         'areaName': area.areaName,
         'areaId': area.areaId,
         'cityId': city.cityId,
-        'customerId': customer.customerId,
       });
       return SiteDetail.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw SiteServiceException(_messageFrom(e, 'Could not update the site.'));
+    }
+  }
+
+  /// Sets (or clears, when null) the Customer Site Mapping for an existing
+  /// site — never touches SiteName/Area/City.
+  Future<SiteDetail> assignCustomer({required int siteId, required int? customerId}) async {
+    try {
+      final response = await ApiClient.instance.dio.put('/api/sites/$siteId/customer', data: {
+        'customerId': customerId,
+      });
+      return SiteDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw SiteServiceException(_messageFrom(e, 'Could not update the mapping.'));
     }
   }
 

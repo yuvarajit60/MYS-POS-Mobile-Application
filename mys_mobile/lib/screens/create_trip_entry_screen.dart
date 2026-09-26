@@ -5,6 +5,7 @@ import '../models/driver_vehicle.dart';
 import '../models/product.dart';
 import '../models/site.dart';
 import '../models/trip_entry_line.dart';
+import '../services/customer_service.dart';
 import '../services/employee_service.dart';
 import '../services/product_service.dart';
 import '../services/site_service.dart';
@@ -18,9 +19,11 @@ import 'widgets/trip_entry_line_items_grid.dart';
 /// it's implicit from the logged-in user's own LOCATIONID, not a free
 /// cross-location dropdown as on the desktop screen this mirrors.
 ///
-/// Customer is picked indirectly: the rep searches Sites (not customers)
-/// and the customer is derived from SITE.CUSTOMERID — there's no separate
-/// "pick a customer" step, per how the desktop screen's data model works.
+/// Customer is normally derived from the picked Site's Customer Site
+/// Mapping (SITE.CUSTOMERID). Sites created in the standalone "Site" master
+/// have no mapping yet, so when the picked site's customerId is null, the
+/// Customer field switches to a manual picker sourced from the Customer
+/// table instead of staying auto-filled/read-only.
 class CreateTripEntryScreen extends StatefulWidget {
   const CreateTripEntryScreen({super.key});
 
@@ -31,6 +34,7 @@ class CreateTripEntryScreen extends StatefulWidget {
 class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   final _employeeService = EmployeeService();
   final _siteService = SiteService();
+  final _customerService = CustomerService();
   final _productService = ProductService();
   final _tripEntryService = TripEntryService();
 
@@ -84,12 +88,25 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
 
     setState(() {
       _selectedSite = site;
-      _selectedCustomer = Customer(
-        customerId: site.customerId,
-        customerName: site.customerName,
-        mobileNo: site.mobileNo,
-      );
+      _selectedCustomer = site.customerId == null
+          ? null
+          : Customer(
+              customerId: site.customerId!,
+              customerName: site.customerName ?? '',
+              mobileNo: site.mobileNo,
+            );
     });
+  }
+
+  Future<void> _pickCustomer() async {
+    final customer = await showSearchPicker<Customer>(
+      context: context,
+      title: 'Search customer name or mobile number',
+      search: _customerService.search,
+      itemLabel: (c) => c.customerName,
+      itemSubtitle: (c) => c.mobileNo,
+    );
+    if (customer != null) setState(() => _selectedCustomer = customer);
   }
 
   Future<void> _pickTripDate() async {
@@ -205,8 +222,12 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
   void _onDeleteLine(int index) => setState(() => _lines.removeAt(index));
 
   Future<void> _saveAndClose() async {
-    if (_selectedSite == null || _selectedCustomer == null) {
+    if (_selectedSite == null) {
       _showMessage('Select a site.');
+      return;
+    }
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer.');
       return;
     }
     if (_selectedDriver == null) {
@@ -285,14 +306,22 @@ class _CreateTripEntryScreenState extends State<CreateTripEntryScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // Read-only — derived from the selected site's CUSTOMERID, not
-            // independently pickable.
-            InputDecorator(
-              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer'),
-              child: Text(
-                _selectedCustomer == null
-                    ? 'Select a site to fill this in'
-                    : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+            // Auto-filled from the site's Customer Site Mapping when
+            // present (read-only). Sites with no mapping leave this
+            // tappable so the rep can pick a customer manually.
+            InkWell(
+              onTap: (_selectedSite != null && _selectedSite!.customerId == null) ? _pickCustomer : null,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: 'Customer',
+                  helperText: (_selectedSite != null && _selectedSite!.customerId == null) ? 'Not mapped to a site — select manually' : null,
+                ),
+                child: Text(
+                  _selectedCustomer == null
+                      ? (_selectedSite == null ? 'Select a site first' : 'Tap to select a customer')
+                      : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+                ),
               ),
             ),
             const SizedBox(height: 16),

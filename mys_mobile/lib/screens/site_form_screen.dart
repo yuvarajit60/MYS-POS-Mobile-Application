@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/area.dart';
 import '../models/city.dart';
-import '../models/customer.dart';
 import '../models/site_detail.dart';
 import '../services/area_service.dart';
 import '../services/city_service.dart';
-import '../services/customer_service.dart';
 import '../services/site_service.dart';
 import 'area_form_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 
-/// Add-or-edit form for a Site — maps a site/delivery location to the
-/// customer it belongs to. Mirrors CustomerFormScreen's structure.
+/// Add-or-edit form for a Site — bare SiteName/Area/City, no customer.
+/// Which customer (if any) a site belongs to is owned by the separate
+/// "Customer Site Mapping" master (see manage_customer_site_mappings_screen.dart),
+/// not this screen.
 class SiteFormScreen extends StatefulWidget {
   final SiteDetail? editing;
-  final Customer? initialCustomer;
-  const SiteFormScreen({super.key, this.editing, this.initialCustomer});
+  const SiteFormScreen({super.key, this.editing});
 
   @override
   State<SiteFormScreen> createState() => _SiteFormScreenState();
@@ -25,11 +24,9 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final _siteNameController = TextEditingController(text: widget.editing?.siteName);
   final _siteService = SiteService();
-  final _customerService = CustomerService();
   final _cityService = CityService();
   final _areaService = AreaService();
 
-  Customer? _selectedCustomer;
   City? _selectedCity;
   Area? _selectedArea;
   bool _saving = false;
@@ -42,25 +39,11 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
     super.initState();
     final editing = widget.editing;
     if (editing != null) {
-      _selectedCustomer = Customer(customerId: editing.customerId, customerName: editing.customerName, mobileNo: '');
       _selectedCity = City(cityId: editing.cityId, cityName: editing.cityName);
       if (editing.areaId > 0) {
         _selectedArea = Area(areaId: editing.areaId, areaName: editing.areaName, cityId: editing.cityId, cityName: editing.cityName);
       }
-    } else if (widget.initialCustomer != null) {
-      _selectedCustomer = widget.initialCustomer;
     }
-  }
-
-  Future<void> _pickCustomer() async {
-    final customer = await showSearchPicker<Customer>(
-      context: context,
-      title: 'Search customer name or mobile number',
-      search: _customerService.search,
-      itemLabel: (c) => c.customerName,
-      itemSubtitle: (c) => c.mobileNo,
-    );
-    if (customer != null) setState(() => _selectedCustomer = customer);
   }
 
   Future<void> _pickCity() async {
@@ -98,10 +81,6 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a customer.')));
-      return;
-    }
     if (_selectedCity == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a city.')));
       return;
@@ -121,13 +100,11 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
               siteName: siteName,
               area: _selectedArea!,
               city: _selectedCity!,
-              customer: _selectedCustomer!,
             )
           : await _siteService.create(
               siteName: siteName,
               area: _selectedArea!,
               city: _selectedCity!,
-              customer: _selectedCustomer!,
             );
       if (!mounted) return;
       Navigator.of(context).pop<SiteDetail>(site);
@@ -197,14 +174,6 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              InkWell(
-                onTap: _pickCustomer,
-                child: InputDecorator(
-                  decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer Name'),
-                  child: Text(_selectedCustomer?.customerName ?? 'Tap to select a customer'),
-                ),
-              ),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _siteNameController,
                 decoration: const InputDecoration(labelText: 'Site Name', border: OutlineInputBorder()),

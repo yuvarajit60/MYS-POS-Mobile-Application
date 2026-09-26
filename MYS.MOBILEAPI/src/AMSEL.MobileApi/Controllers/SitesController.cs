@@ -66,4 +66,12 @@ public class SitesController : ControllerBase
             siteId, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
         return deleted ? NoContent() : NotFound();
     }
+
+    [HttpPut("{siteId:int}/customer")]
+    public async Task<ActionResult<SiteDetailDto>> AssignCustomer(int siteId, AssignSiteCustomerRequest request)
+    {
+        var result = await _siteService.AssignCustomerAsync(
+            siteId, request, User.GetLocationId(), User.GetUserId(), User.GetEmployeeId());
+        return result is null ? NotFound() : Ok(result);
+    }
 }
