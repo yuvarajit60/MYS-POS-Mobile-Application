@@ -7,3 +7,10 @@ public record LedgerEntryDto(
     decimal TotalAmount,
     decimal ReceivedAmount,
     decimal OutstandingAmount);
+
+/// <summary>Shown instead of a per-customer ledger when no customer is selected in the filter.</summary>
+public record LedgerSummaryDto(
+    int TotalCustomers,
+    decimal TotalDeliveryAmount,
+    decimal TotalTripEntryAmount,
+    decimal TotalPaymentAmount);

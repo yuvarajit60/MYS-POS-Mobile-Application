@@ -22,4 +22,8 @@ public class LedgerController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<LedgerEntryDto>>> Get(
         [FromQuery] int customerId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
         => Ok(await _ledgerService.GetAsync(User.GetLocationId(), customerId, fromDate, toDate));
+
+    [HttpGet("summary")]
+    public async Task<ActionResult<LedgerSummaryDto>> GetSummary([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+        => Ok(await _ledgerService.GetSummaryAsync(User.GetLocationId(), fromDate, toDate));
 }

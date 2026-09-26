@@ -95,6 +95,10 @@
   client with no dbo.CHANGE_DATE/GETDATE() fallback, same convention as
   TRIPENTRY.TRIPDATE.
 
+  Also folds in 028_ledger_include_trip_entry.sql (see that file's header):
+  SP_MOBILE_GET_CUSTOMER_LEDGER now unions in Trip Entry as a third billed
+  transaction type alongside Delivery and Payment.
+
   Also folds in 020_salesorder_discount.sql (see that file's header):
   dbo.TVP_MOBILE_SALESORDER_LINES gets a new DISCOUNTAMOUNT column (a
   flat, tax-exclusive, per-line amount from the Sales Order screen's new
@@ -1105,6 +1109,16 @@ BEGIN
         WHERE SO.CUSTOMERID = @CUSTOMERID AND SO.LOCATIONID = @LOCATIONID
         GROUP BY DD.DELIVERYNO
     ),
+    TripTxns AS (
+        SELECT
+            TE.ENTRYNO AS TXNNO,
+            TE.TRIPDATE AS TXNDATE,
+            'Trip Entry' AS TXNTYPE,
+            TE.NETAMOUNT AS TOTALAMOUNT,
+            CAST(0 AS NUMERIC(18,2)) AS RECEIVEDAMOUNT
+        FROM dbo.TRIPENTRY TE
+        WHERE TE.CUSTOMERID = @CUSTOMERID AND TE.LOCATIONID = @LOCATIONID AND TE.CANCEL = 0
+    ),
     PaymentTxns AS (
         SELECT
             PD.PAYMENTNO AS TXNNO,
@@ -1117,6 +1131,8 @@ BEGIN
     ),
     Combined AS (
         SELECT * FROM DeliveryTxns
+        UNION ALL
+        SELECT * FROM TripTxns
         UNION ALL
         SELECT * FROM PaymentTxns
     ),

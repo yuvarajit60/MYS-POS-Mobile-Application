@@ -5,6 +5,7 @@ import '../models/company.dart';
 import '../models/delivery_detail.dart';
 import '../models/delivery_summary.dart';
 import '../models/ledger_entry.dart';
+import '../models/ledger_summary.dart';
 import '../models/order_detail.dart';
 import '../models/payment_report_entry.dart';
 import '../models/sales_order_summary.dart';
@@ -562,6 +563,67 @@ class ReportPdfBuilder {
             ),
           ),
         ],
+      ),
+    );
+
+    return doc;
+  }
+
+  /// All-customers ledger summary — printed when the Customer Ledger report
+  /// is generated with no customer selected (see LedgerSummary/
+  /// LedgerService.getSummary). Just the four aggregate totals, no
+  /// per-transaction rows, unlike buildLedgerSummary above.
+  static Future<pw.Document> buildLedgerOverallSummary({
+    required LedgerSummary summary,
+    required Company? company,
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    final doc = pw.Document();
+    final printedAt = _printedFormat.format(DateTime.now());
+
+    final periodText = (fromDate == null && toDate == null)
+        ? 'All Transactions'
+        : 'Period: ${fromDate != null ? _dateFormat.format(fromDate) : 'Beginning'} to ${toDate != null ? _dateFormat.format(toDate) : 'Date'}';
+
+    pw.Widget totalRow(String label, String value, {bool bold = false}) => pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 6),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(label, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 11)),
+              pw.Text(value, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 11)),
+            ],
+          ),
+        );
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(child: _companyHeader(company)),
+                pw.Text('Printed $printedAt', style: const pw.TextStyle(fontSize: 9)),
+              ],
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text('Customer Ledger — All Customers Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 4),
+            pw.Text(periodText, style: const pw.TextStyle(fontSize: 10)),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
+            totalRow('Total Customers', summary.totalCustomers.toString(), bold: true),
+            pw.Divider(),
+            totalRow('Total Delivery Amount', _amountFormat.format(summary.totalDeliveryAmount)),
+            totalRow('Total Trip Entry Amount', _amountFormat.format(summary.totalTripEntryAmount)),
+            totalRow('Total Payment Amount', _amountFormat.format(summary.totalPaymentAmount)),
+          ],
+        ),
       ),
     );
 

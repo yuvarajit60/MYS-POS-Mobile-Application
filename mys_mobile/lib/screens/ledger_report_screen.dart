@@ -5,16 +5,20 @@ import '../core/company_provider.dart';
 import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
 import '../models/ledger_entry.dart';
+import '../models/ledger_summary.dart';
+import '../services/customer_service.dart';
 import '../services/ledger_service.dart';
-import '../services/payment_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
-/// Customer ledger — a running Delivery/Payment statement with an
-/// Outstanding Amount balance, derived from DELIVERY_DETAILS +
-/// PAYMENT_DETAILS (see SP_MOBILE_GET_CUSTOMER_LEDGER). Customer is
-/// required; the date range only narrows which rows are shown — the
-/// running balance on each row still reflects the customer's entire
-/// history, not just the filtered window (see LedgerService).
+/// Customer ledger — a running Delivery/Trip Entry/Payment statement with an
+/// Outstanding Amount balance (see SP_MOBILE_GET_CUSTOMER_LEDGER). The date
+/// range only narrows which rows are shown — the running balance on each
+/// row still reflects the customer's entire history, not just the filtered
+/// window (see LedgerService).
+///
+/// Customer is optional: leaving it blank shows an all-customers summary
+/// (total customers with activity, total Delivery/Trip Entry/Payment
+/// amounts for the period) instead of one customer's running ledger.
 class LedgerReportScreen extends StatefulWidget {
   const LedgerReportScreen({super.key});
 
@@ -23,7 +27,7 @@ class LedgerReportScreen extends StatefulWidget {
 }
 
 class _LedgerReportScreenState extends State<LedgerReportScreen> {
-  final _paymentService = PaymentService();
+  final _customerService = CustomerService();
   final _ledgerService = LedgerService();
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
 
@@ -34,12 +38,13 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
   bool _loading = false;
   String? _error;
   List<LedgerEntry>? _rows;
+  LedgerSummary? _summary;
 
   Future<void> _pickCustomer() async {
     final customer = await showSearchPicker<Customer>(
       context: context,
-      title: 'Search customer',
-      search: _paymentService.searchDeliveredCustomers,
+      title: 'Search customer (leave blank for all)',
+      search: _customerService.search,
       itemLabel: (c) => c.customerName,
       itemSubtitle: (c) => c.mobileNo,
     );
@@ -47,6 +52,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     setState(() {
       _selectedCustomer = customer;
       _rows = null;
+      _summary = null;
       _error = null;
     });
     _generate();
@@ -64,19 +70,31 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
   }
 
   Future<void> _generate() async {
-    if (_selectedCustomer == null) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final rows = await _ledgerService.getLedger(
-        customerId: _selectedCustomer!.customerId,
-        fromDate: _fromDate,
-        toDate: _toDate,
-      );
-      if (!mounted) return;
-      setState(() => _rows = rows);
+      final customer = _selectedCustomer;
+      if (customer == null) {
+        final summary = await _ledgerService.getSummary(fromDate: _fromDate, toDate: _toDate);
+        if (!mounted) return;
+        setState(() {
+          _summary = summary;
+          _rows = null;
+        });
+      } else {
+        final rows = await _ledgerService.getLedger(
+          customerId: customer.customerId,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+        if (!mounted) return;
+        setState(() {
+          _rows = rows;
+          _summary = null;
+        });
+      }
     } on LedgerServiceException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -85,13 +103,20 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
   }
 
   Future<void> _print() async {
-    final doc = await ReportPdfBuilder.buildLedgerSummary(
-      rows: _rows ?? [],
-      company: CompanyProvider.instance.company,
-      customerName: _selectedCustomer?.customerName ?? '',
-      fromDate: _fromDate,
-      toDate: _toDate,
-    );
+    final doc = _selectedCustomer == null
+        ? await ReportPdfBuilder.buildLedgerOverallSummary(
+            summary: _summary ?? LedgerSummary(totalCustomers: 0, totalDeliveryAmount: 0, totalTripEntryAmount: 0, totalPaymentAmount: 0),
+            company: CompanyProvider.instance.company,
+            fromDate: _fromDate,
+            toDate: _toDate,
+          )
+        : await ReportPdfBuilder.buildLedgerSummary(
+            rows: _rows ?? [],
+            company: CompanyProvider.instance.company,
+            customerName: _selectedCustomer?.customerName ?? '',
+            fromDate: _fromDate,
+            toDate: _toDate,
+          );
     await Printing.layoutPdf(onLayout: (format) => doc.save());
   }
 
@@ -110,8 +135,21 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
                   InkWell(
                     onTap: _pickCustomer,
                     child: InputDecorator(
-                      decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Customer'),
-                      child: Text(_selectedCustomer?.customerName ?? 'Tap to select a customer'),
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: 'Customer',
+                        suffixIcon: _selectedCustomer == null
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => setState(() {
+                                  _selectedCustomer = null;
+                                  _rows = null;
+                                  _summary = null;
+                                }),
+                              ),
+                      ),
+                      child: Text(_selectedCustomer?.customerName ?? 'All Customers'),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -152,7 +190,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: (_loading || _selectedCustomer == null) ? null : _generate,
+                    onPressed: _loading ? null : _generate,
                     child: _loading ? const CircularProgressIndicator() : const Text('Generate Report'),
                   ),
                   if (_error != null) ...[
@@ -160,12 +198,13 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
                     Text(_error!, style: const TextStyle(color: Colors.red)),
                   ],
                   const SizedBox(height: 16),
+                  if (_summary != null) _buildSummary(_summary!),
                   if (_rows != null) _buildResults(),
                 ],
               ),
             ),
           ),
-          if (_rows?.isNotEmpty ?? false)
+          if ((_rows?.isNotEmpty ?? false) || _summary != null)
             SafeArea(
               minimum: const EdgeInsets.all(16),
               child: FilledButton.icon(
@@ -176,6 +215,35 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSummary(LedgerSummary summary) {
+    Widget row(String label, String value, {bool bold = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null),
+              Text(value, style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null),
+            ],
+          ),
+        );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            row('Total Customers', summary.totalCustomers.toString(), bold: true),
+            const Divider(),
+            row('Total Delivery Amount', summary.totalDeliveryAmount.toStringAsFixed(2)),
+            row('Total Trip Entry Amount', summary.totalTripEntryAmount.toStringAsFixed(2)),
+            row('Total Payment Amount', summary.totalPaymentAmount.toStringAsFixed(2)),
+          ],
+        ),
       ),
     );
   }
@@ -195,7 +263,11 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
               leading: CircleAvatar(
                 backgroundColor: row.txnType == 'Payment' ? Colors.green.shade100 : Colors.orange.shade100,
                 child: Icon(
-                  row.txnType == 'Payment' ? Icons.arrow_downward : Icons.local_shipping_outlined,
+                  row.txnType == 'Payment'
+                      ? Icons.arrow_downward
+                      : row.txnType == 'Trip Entry'
+                          ? Icons.local_shipping_outlined
+                          : Icons.local_shipping,
                   color: row.txnType == 'Payment' ? Colors.green.shade800 : Colors.orange.shade800,
                   size: 20,
                 ),
