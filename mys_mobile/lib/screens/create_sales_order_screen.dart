@@ -57,6 +57,30 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
     });
   }
 
+  /// Sites already mapped to the selected customer come first, followed by
+  /// every other existing site (deduplicated) — a site not yet linked to
+  /// this customer is still pickable, since sites get reused across jobs
+  /// for different customers rather than belonging to one forever.
+  Future<List<Site>> _searchSitesForCustomer(String query) async {
+    final results = await Future.wait([
+      _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      _siteService.search(query),
+    ]);
+    final mapped = results[0];
+    final all = results[1];
+    final mappedIds = mapped.map((s) => s.siteId).toSet();
+    return [...mapped, ...all.where((s) => !mappedIds.contains(s.siteId))];
+  }
+
+  Site _siteFromDetail(SiteDetail detail) => Site(
+        siteId: detail.siteId,
+        siteName: detail.siteName,
+        areaName: detail.areaName,
+        customerId: detail.customerId,
+        customerName: detail.customerName,
+        mobileNo: _selectedCustomer?.mobileNo ?? '',
+      );
+
   Future<void> _pickSite() async {
     if (_selectedCustomer == null) {
       _showMessage('Select a customer first.');
@@ -66,9 +90,10 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
     final site = await showSearchPicker<Site>(
       context: context,
       title: 'Search site',
-      search: (query) => _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      search: _searchSitesForCustomer,
       itemLabel: (s) => s.siteName,
-      itemSubtitle: (s) => s.areaName,
+      itemSubtitle: (s) =>
+          s.customerId == _selectedCustomer!.customerId ? s.areaName : '${s.customerName ?? 'Not mapped'} • ${s.areaName}',
       addNewLabel: 'Add New Site',
       onAddNew: (context) async {
         final detail = await Navigator.of(context).push<SiteDetail>(
@@ -81,17 +106,27 @@ class _CreateSalesOrderScreenState extends State<CreateSalesOrderScreen> {
           siteId: detail.siteId,
           customerId: _selectedCustomer!.customerId,
         );
-        return Site(
-          siteId: mapped.siteId,
-          siteName: mapped.siteName,
-          areaName: mapped.areaName,
-          customerId: mapped.customerId,
-          customerName: mapped.customerName,
-          mobileNo: _selectedCustomer!.mobileNo,
-        );
+        return _siteFromDetail(mapped);
       },
     );
-    if (site != null) setState(() => _selectedSite = site);
+    if (site == null) return;
+
+    if (site.customerId == _selectedCustomer!.customerId) {
+      setState(() => _selectedSite = site);
+      return;
+    }
+
+    // New Customer + Site combination (the site was unmapped, or mapped to
+    // a different customer) — record it in SITE_MAPPING before using it.
+    try {
+      final mapped = await _siteService.assignCustomer(
+        siteId: site.siteId,
+        customerId: _selectedCustomer!.customerId,
+      );
+      setState(() => _selectedSite = _siteFromDetail(mapped));
+    } on SiteServiceException catch (e) {
+      _showMessage(e.message);
+    }
   }
 
   Future<void> _addProduct() async {
