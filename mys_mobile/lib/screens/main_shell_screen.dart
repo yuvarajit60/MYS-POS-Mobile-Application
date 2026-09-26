@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/session.dart';
+import 'create_cancel_entry_screen.dart';
 import 'create_delivery_screen.dart';
 import 'create_payment_screen.dart';
 import 'create_sales_order_screen.dart';
@@ -65,6 +66,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.payments_outlined,
           label: 'Payment Entry',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreatePaymentScreen())),
+        ),
+        ActionItem(
+          icon: Icons.cancel_outlined,
+          label: 'Cancel Entry',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateCancelEntryScreen())),
         ),
       ];
 
