@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../core/api_client.dart';
+import '../models/ledger_all_customers_row.dart';
 import '../models/ledger_entry.dart';
-import '../models/ledger_summary.dart';
 
 class LedgerServiceException implements Exception {
   final String message;
@@ -29,14 +29,15 @@ class LedgerService {
     }
   }
 
-  /// All-customers aggregate, shown when no customer is selected in the filter.
-  Future<LedgerSummary> getSummary({DateTime? fromDate, DateTime? toDate}) async {
+  /// Flat register of every transaction across every customer, shown when
+  /// no customer is selected in the filter.
+  Future<List<LedgerAllCustomersRow>> getAllCustomers({DateTime? fromDate, DateTime? toDate}) async {
     try {
-      final response = await ApiClient.instance.dio.get('/api/reports/ledger/summary', queryParameters: {
+      final response = await ApiClient.instance.dio.get('/api/reports/ledger/all-customers', queryParameters: {
         'fromDate': ?(fromDate == null ? null : _dateFormat.format(fromDate)),
         'toDate': ?(toDate == null ? null : _dateFormat.format(toDate)),
       });
-      return LedgerSummary.fromJson(response.data as Map<String, dynamic>);
+      return (response.data as List).map((e) => LedgerAllCustomersRow.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw LedgerServiceException(_messageFrom(e));
     }

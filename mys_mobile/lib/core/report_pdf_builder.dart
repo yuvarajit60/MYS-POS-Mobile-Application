@@ -4,8 +4,8 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/company.dart';
 import '../models/delivery_detail.dart';
 import '../models/delivery_summary.dart';
+import '../models/ledger_all_customers_row.dart';
 import '../models/ledger_entry.dart';
-import '../models/ledger_summary.dart';
 import '../models/order_detail.dart';
 import '../models/payment_report_entry.dart';
 import '../models/sales_order_summary.dart';
@@ -569,61 +569,110 @@ class ReportPdfBuilder {
     return doc;
   }
 
-  /// All-customers ledger summary — printed when the Customer Ledger report
-  /// is generated with no customer selected (see LedgerSummary/
-  /// LedgerService.getSummary). Just the four aggregate totals, no
-  /// per-transaction rows, unlike buildLedgerSummary above.
-  static Future<pw.Document> buildLedgerOverallSummary({
-    required LedgerSummary summary,
+  /// All-customers ledger register — printed when the Customer Ledger
+  /// report is generated with no customer selected (see
+  /// LedgerAllCustomersRow/LedgerService.getAllCustomers). One row per
+  /// transaction across every customer (Tally "Ledger Vouchers"-style),
+  /// with a Report Totals footer, rather than one customer's running
+  /// ledger like buildLedgerSummary above.
+  static Future<pw.Document> buildLedgerAllCustomers({
+    required List<LedgerAllCustomersRow> rows,
     required Company? company,
     DateTime? fromDate,
     DateTime? toDate,
   }) async {
     final doc = pw.Document();
     final printedAt = _printedFormat.format(DateTime.now());
+    final totalQty = rows.fold<double>(0, (sum, r) => sum + r.qty);
+    final totalAmount = rows.fold<double>(0, (sum, r) => sum + r.totalAmount);
+    final receivedAmount = rows.fold<double>(0, (sum, r) => sum + r.receivedAmount);
+    final outstandingAmount = rows.fold<double>(0, (sum, r) => sum + r.outstandingAmount);
 
     final periodText = (fromDate == null && toDate == null)
         ? 'All Transactions'
         : 'Period: ${fromDate != null ? _dateFormat.format(fromDate) : 'Beginning'} to ${toDate != null ? _dateFormat.format(toDate) : 'Date'}';
 
-    pw.Widget totalRow(String label, String value, {bool bold = false}) => pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(vertical: 6),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(label, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 11)),
-              pw.Text(value, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 11)),
-            ],
-          ),
-        );
-
     doc.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: _pageFormat,
         margin: _margin,
-        build: (context) => pw.Column(
+        header: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Expanded(child: _companyHeader(company)),
-                pw.Text('Printed $printedAt', style: const pw.TextStyle(fontSize: 9)),
+                pw.Text('Page ${context.pageNumber} of ${context.pagesCount}', style: const pw.TextStyle(fontSize: 9)),
               ],
             ),
             pw.SizedBox(height: 10),
-            pw.Text('Customer Ledger — All Customers Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Expanded(
+                  child: pw.Text('Customer Ledger — All Customers', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                ),
+                pw.Text('Printed $printedAt', style: const pw.TextStyle(fontSize: 9)),
+              ],
+            ),
             pw.SizedBox(height: 4),
             pw.Text(periodText, style: const pw.TextStyle(fontSize: 10)),
             pw.Divider(),
-            pw.SizedBox(height: 8),
-            totalRow('Total Customers', summary.totalCustomers.toString(), bold: true),
-            pw.Divider(),
-            totalRow('Total Delivery Amount', _amountFormat.format(summary.totalDeliveryAmount)),
-            totalRow('Total Trip Entry Amount', _amountFormat.format(summary.totalTripEntryAmount)),
-            totalRow('Total Payment Amount', _amountFormat.format(summary.totalPaymentAmount)),
           ],
         ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Date', 'Customer', 'Type', 'Txn No', 'Qty', 'Total Amount', 'Received Amount', 'Outstanding Amount'],
+            data: rows
+                .map((r) => [
+                      _dateFormat.format(r.txnDate),
+                      r.customerName,
+                      r.txnType,
+                      r.txnNo,
+                      _amountFormat.format(r.qty),
+                      _amountFormat.format(r.totalAmount),
+                      _amountFormat.format(r.receivedAmount),
+                      _amountFormat.format(r.outstandingAmount),
+                    ])
+                .toList(),
+            cellAlignments: {4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight, 6: pw.Alignment.centerRight, 7: pw.Alignment.centerRight},
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Container(
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(width: 1), bottom: pw.BorderSide(width: 1)),
+            ),
+            padding: const pw.EdgeInsets.symmetric(vertical: 6),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  flex: 3,
+                  child: pw.Text('Report Totals', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ),
+                pw.Expanded(
+                  child: pw.Text(_amountFormat.format(totalQty),
+                      textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ),
+                pw.Expanded(
+                  child: pw.Text(_amountFormat.format(totalAmount),
+                      textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ),
+                pw.Expanded(
+                  child: pw.Text(_amountFormat.format(receivedAmount),
+                      textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ),
+                pw.Expanded(
+                  child: pw.Text(_amountFormat.format(outstandingAmount),
+                      textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
 

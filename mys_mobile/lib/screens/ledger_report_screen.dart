@@ -4,8 +4,8 @@ import 'package:printing/printing.dart';
 import '../core/company_provider.dart';
 import '../core/report_pdf_builder.dart';
 import '../models/customer.dart';
+import '../models/ledger_all_customers_row.dart';
 import '../models/ledger_entry.dart';
-import '../models/ledger_summary.dart';
 import '../services/customer_service.dart';
 import '../services/ledger_service.dart';
 import 'widgets/search_picker_sheet.dart';
@@ -16,9 +16,10 @@ import 'widgets/search_picker_sheet.dart';
 /// row still reflects the customer's entire history, not just the filtered
 /// window (see LedgerService).
 ///
-/// Customer is optional: leaving it blank shows an all-customers summary
-/// (total customers with activity, total Delivery/Trip Entry/Payment
-/// amounts for the period) instead of one customer's running ledger.
+/// Customer is optional: leaving it blank shows a flat register of every
+/// transaction across every customer for the period (Tally "Ledger
+/// Vouchers"-style — Customer/Type/Qty/Total/Received/Outstanding, with a
+/// Report Totals footer) instead of one customer's running ledger.
 class LedgerReportScreen extends StatefulWidget {
   const LedgerReportScreen({super.key});
 
@@ -30,6 +31,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
   final _customerService = CustomerService();
   final _ledgerService = LedgerService();
   static final _dateFormat = DateFormat('dd-MMM-yyyy');
+  static final _amountFormat = NumberFormat('#,##0.00');
 
   Customer? _selectedCustomer;
   DateTime? _fromDate;
@@ -38,7 +40,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
   bool _loading = false;
   String? _error;
   List<LedgerEntry>? _rows;
-  LedgerSummary? _summary;
+  List<LedgerAllCustomersRow>? _allRows;
 
   Future<void> _pickCustomer() async {
     final customer = await showSearchPicker<Customer>(
@@ -52,7 +54,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     setState(() {
       _selectedCustomer = customer;
       _rows = null;
-      _summary = null;
+      _allRows = null;
       _error = null;
     });
     _generate();
@@ -77,10 +79,10 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     try {
       final customer = _selectedCustomer;
       if (customer == null) {
-        final summary = await _ledgerService.getSummary(fromDate: _fromDate, toDate: _toDate);
+        final rows = await _ledgerService.getAllCustomers(fromDate: _fromDate, toDate: _toDate);
         if (!mounted) return;
         setState(() {
-          _summary = summary;
+          _allRows = rows;
           _rows = null;
         });
       } else {
@@ -92,7 +94,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
         if (!mounted) return;
         setState(() {
           _rows = rows;
-          _summary = null;
+          _allRows = null;
         });
       }
     } on LedgerServiceException catch (e) {
@@ -104,8 +106,8 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
 
   Future<dynamic> _buildDoc() {
     return _selectedCustomer == null
-        ? ReportPdfBuilder.buildLedgerOverallSummary(
-            summary: _summary ?? LedgerSummary(totalCustomers: 0, totalDeliveryAmount: 0, totalTripEntryAmount: 0, totalPaymentAmount: 0),
+        ? ReportPdfBuilder.buildLedgerAllCustomers(
+            rows: _allRows ?? [],
             company: CompanyProvider.instance.company,
             fromDate: _fromDate,
             toDate: _toDate,
@@ -154,7 +156,7 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
                                 onPressed: () => setState(() {
                                   _selectedCustomer = null;
                                   _rows = null;
-                                  _summary = null;
+                                  _allRows = null;
                                 }),
                               ),
                       ),
@@ -207,13 +209,13 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
                     Text(_error!, style: const TextStyle(color: Colors.red)),
                   ],
                   const SizedBox(height: 16),
-                  if (_summary != null) _buildSummary(_summary!),
+                  if (_allRows != null) _buildAllCustomersResults(),
                   if (_rows != null) _buildResults(),
                 ],
               ),
             ),
           ),
-          if ((_rows?.isNotEmpty ?? false) || _summary != null)
+          if ((_rows?.isNotEmpty ?? false) || (_allRows?.isNotEmpty ?? false))
             SafeArea(
               minimum: const EdgeInsets.all(16),
               child: Row(
@@ -243,32 +245,87 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     );
   }
 
-  Widget _buildSummary(LedgerSummary summary) {
-    Widget row(String label, String value, {bool bold = false}) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null),
-              Text(value, style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null),
-            ],
-          ),
-        );
+  Widget _kv(String label, String value, {bool bold = false}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          Text(value, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+        ],
+      );
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            row('Total Customers', summary.totalCustomers.toString(), bold: true),
-            const Divider(),
-            row('Total Delivery Amount', summary.totalDeliveryAmount.toStringAsFixed(2)),
-            row('Total Trip Entry Amount', summary.totalTripEntryAmount.toStringAsFixed(2)),
-            row('Total Payment Amount', summary.totalPaymentAmount.toStringAsFixed(2)),
-          ],
+  Widget _buildAllCustomersResults() {
+    final rows = _allRows!;
+    if (rows.isEmpty) return const Center(child: Text('No transactions found for this period.'));
+
+    final totalQty = rows.fold<double>(0, (sum, r) => sum + r.qty);
+    final totalAmount = rows.fold<double>(0, (sum, r) => sum + r.totalAmount);
+    final receivedAmount = rows.fold<double>(0, (sum, r) => sum + r.receivedAmount);
+    final outstandingAmount = rows.fold<double>(0, (sum, r) => sum + r.outstandingAmount);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final row in rows)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text(row.customerName, style: const TextStyle(fontWeight: FontWeight.w600))),
+                      Text(_dateFormat.format(row.txnDate), style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                  Text('${row.txnType}  •  ${row.txnNo}', style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: _kv('Qty', _amountFormat.format(row.qty))),
+                      Expanded(child: _kv('Total', _amountFormat.format(row.totalAmount))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: _kv('Received', _amountFormat.format(row.receivedAmount))),
+                      Expanded(child: _kv('Outstanding', _amountFormat.format(row.outstandingAmount), bold: true)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const Divider(),
+        Card(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Report Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _kv('Qty', _amountFormat.format(totalQty), bold: true)),
+                    Expanded(child: _kv('Total', _amountFormat.format(totalAmount), bold: true)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: _kv('Received', _amountFormat.format(receivedAmount), bold: true)),
+                    Expanded(child: _kv('Outstanding', _amountFormat.format(outstandingAmount), bold: true)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
