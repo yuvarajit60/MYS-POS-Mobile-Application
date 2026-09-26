@@ -112,15 +112,24 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
     }
   }
 
-  Future<void> _print() async {
-    final doc = await ReportPdfBuilder.buildTripEntrySummary(
+  Future<dynamic> _buildDoc() {
+    return ReportPdfBuilder.buildTripEntrySummary(
       rows: _rows ?? [],
       company: CompanyProvider.instance.company,
       customerName: _selectedCustomer?.customerName,
       fromDate: _fromDate,
       toDate: _toDate,
     );
+  }
+
+  Future<void> _print() async {
+    final doc = await _buildDoc();
     await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
+  Future<void> _share() async {
+    final doc = await _buildDoc();
+    await Printing.sharePdf(bytes: await doc.save(), filename: 'trip_entry_report.pdf');
   }
 
   @override
@@ -236,11 +245,26 @@ class _TripEntryReportsScreenState extends State<TripEntryReportsScreen> {
           if (_rows?.isNotEmpty ?? false)
             SafeArea(
               minimum: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Print'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: _print,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Share'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _share,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _print,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

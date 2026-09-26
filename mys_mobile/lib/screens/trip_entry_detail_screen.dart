@@ -49,9 +49,18 @@ class _TripEntryDetailScreenState extends State<TripEntryDetailScreen> {
     }
   }
 
+  Future<dynamic> _buildDoc() {
+    return ReportPdfBuilder.buildTripEntryDetail(tripEntry: _tripEntry!, company: CompanyProvider.instance.company);
+  }
+
   Future<void> _print() async {
-    final doc = await ReportPdfBuilder.buildTripEntryDetail(tripEntry: _tripEntry!, company: CompanyProvider.instance.company);
+    final doc = await _buildDoc();
     await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
+  Future<void> _share() async {
+    final doc = await _buildDoc();
+    await Printing.sharePdf(bytes: await doc.save(), filename: 'trip_entry_detail.pdf');
   }
 
   String _lineSubtitle(TripEntryDetailLine line) {
@@ -75,11 +84,26 @@ class _TripEntryDetailScreenState extends State<TripEntryDetailScreen> {
           ? null
           : SafeArea(
               minimum: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Print'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: _print,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Share'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _share,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _print,
+                    ),
+                  ),
+                ],
               ),
             ),
     );

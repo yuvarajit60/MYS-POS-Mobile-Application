@@ -102,22 +102,31 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
     }
   }
 
-  Future<void> _print() async {
-    final doc = _selectedCustomer == null
-        ? await ReportPdfBuilder.buildLedgerOverallSummary(
+  Future<dynamic> _buildDoc() {
+    return _selectedCustomer == null
+        ? ReportPdfBuilder.buildLedgerOverallSummary(
             summary: _summary ?? LedgerSummary(totalCustomers: 0, totalDeliveryAmount: 0, totalTripEntryAmount: 0, totalPaymentAmount: 0),
             company: CompanyProvider.instance.company,
             fromDate: _fromDate,
             toDate: _toDate,
           )
-        : await ReportPdfBuilder.buildLedgerSummary(
+        : ReportPdfBuilder.buildLedgerSummary(
             rows: _rows ?? [],
             company: CompanyProvider.instance.company,
             customerName: _selectedCustomer?.customerName ?? '',
             fromDate: _fromDate,
             toDate: _toDate,
           );
+  }
+
+  Future<void> _print() async {
+    final doc = await _buildDoc();
     await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
+  Future<void> _share() async {
+    final doc = await _buildDoc();
+    await Printing.sharePdf(bytes: await doc.save(), filename: 'customer_ledger.pdf');
   }
 
   @override
@@ -207,11 +216,26 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
           if ((_rows?.isNotEmpty ?? false) || _summary != null)
             SafeArea(
               minimum: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Print'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: _print,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Share'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _share,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _print,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

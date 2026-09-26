@@ -86,8 +86,8 @@ class _PaymentReportScreenState extends State<PaymentReportScreen> {
     }
   }
 
-  Future<void> _print() async {
-    final doc = await ReportPdfBuilder.buildPaymentReportSummary(
+  Future<dynamic> _buildDoc() {
+    return ReportPdfBuilder.buildPaymentReportSummary(
       rows: _rows ?? [],
       company: CompanyProvider.instance.company,
       customerName: _selectedCustomer?.customerName,
@@ -95,7 +95,16 @@ class _PaymentReportScreenState extends State<PaymentReportScreen> {
       fromDate: _fromDate,
       toDate: _toDate,
     );
+  }
+
+  Future<void> _print() async {
+    final doc = await _buildDoc();
     await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
+  Future<void> _share() async {
+    final doc = await _buildDoc();
+    await Printing.sharePdf(bytes: await doc.save(), filename: 'payment_report.pdf');
   }
 
   @override
@@ -178,11 +187,26 @@ class _PaymentReportScreenState extends State<PaymentReportScreen> {
           if (_rows?.isNotEmpty ?? false)
             SafeArea(
               minimum: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Print'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: _print,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Share'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _share,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _print,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

@@ -46,9 +46,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<dynamic> _buildDoc() {
+    return ReportPdfBuilder.buildOrderDetail(order: _order!, company: CompanyProvider.instance.company);
+  }
+
   Future<void> _print() async {
-    final doc = await ReportPdfBuilder.buildOrderDetail(order: _order!, company: CompanyProvider.instance.company);
+    final doc = await _buildDoc();
     await Printing.layoutPdf(onLayout: (format) => doc.save());
+  }
+
+  Future<void> _share() async {
+    final doc = await _buildDoc();
+    await Printing.sharePdf(bytes: await doc.save(), filename: 'sales_order_detail.pdf');
   }
 
   @override
@@ -64,11 +73,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? null
           : SafeArea(
               minimum: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Print'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: _print,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.share),
+                      label: const Text('Share'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _share,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      onPressed: _print,
+                    ),
+                  ),
+                ],
               ),
             ),
     );
