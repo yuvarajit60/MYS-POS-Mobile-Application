@@ -99,12 +99,10 @@ class _SiteFormScreenState extends State<SiteFormScreen> {
               siteId: widget.editing!.siteId,
               siteName: siteName,
               area: _selectedArea!,
-              city: _selectedCity!,
             )
           : await _siteService.create(
               siteName: siteName,
               area: _selectedArea!,
-              city: _selectedCity!,
             );
       if (!mounted) return;
       Navigator.of(context).pop<SiteDetail>(site);

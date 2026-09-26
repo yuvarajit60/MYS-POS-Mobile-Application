@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/area.dart';
-import '../models/city.dart';
 import '../models/site.dart';
 import '../models/site_detail.dart';
 
@@ -31,14 +30,11 @@ class SiteService {
   Future<SiteDetail> create({
     required String siteName,
     required Area area,
-    required City city,
   }) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/sites', data: {
         'siteName': siteName,
-        'areaName': area.areaName,
         'areaId': area.areaId,
-        'cityId': city.cityId,
       });
       return SiteDetail.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -50,14 +46,11 @@ class SiteService {
     required int siteId,
     required String siteName,
     required Area area,
-    required City city,
   }) async {
     try {
       final response = await ApiClient.instance.dio.put('/api/sites/$siteId', data: {
         'siteName': siteName,
-        'areaName': area.areaName,
         'areaId': area.areaId,
-        'cityId': city.cityId,
       });
       return SiteDetail.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
