@@ -569,10 +569,11 @@ class ReportPdfBuilder {
     return doc;
   }
 
-  /// All-customers ledger register — printed when the Customer Ledger
+  /// All-customers ledger summary — printed when the Customer Ledger
   /// report is generated with no customer selected (see
-  /// LedgerAllCustomersRow/LedgerService.getAllCustomers). One row per
-  /// transaction across every customer (Tally "Ledger Vouchers"-style),
+  /// LedgerAllCustomersRow/LedgerService.getAllCustomers). Qty/Total/
+  /// Received/Outstanding aggregated per Customer + Type (no per-
+  /// transaction date/entry no), sorted by customer name alphabetically,
   /// with a Report Totals footer, rather than one customer's running
   /// ledger like buildLedgerSummary above.
   static Future<pw.Document> buildLedgerAllCustomers({
@@ -623,23 +624,21 @@ class ReportPdfBuilder {
         ),
         build: (context) => [
           pw.TableHelper.fromTextArray(
-            headers: ['Date', 'Customer', 'Type', 'Txn No', 'Qty', 'Total Amount', 'Received Amount', 'Outstanding Amount'],
+            headers: ['Customer', 'Type', 'Qty', 'Total Amount', 'Received Amount', 'Outstanding Amount'],
             data: rows
                 .map((r) => [
-                      _dateFormat.format(r.txnDate),
                       r.customerName,
                       r.txnType,
-                      r.txnNo,
                       _amountFormat.format(r.qty),
                       _amountFormat.format(r.totalAmount),
                       _amountFormat.format(r.receivedAmount),
                       _amountFormat.format(r.outstandingAmount),
                     ])
                 .toList(),
-            cellAlignments: {4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight, 6: pw.Alignment.centerRight, 7: pw.Alignment.centerRight},
+            cellAlignments: {2: pw.Alignment.centerRight, 3: pw.Alignment.centerRight, 4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight},
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
-            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellStyle: const pw.TextStyle(fontSize: 9),
           ),
           pw.SizedBox(height: 4),
           pw.Container(

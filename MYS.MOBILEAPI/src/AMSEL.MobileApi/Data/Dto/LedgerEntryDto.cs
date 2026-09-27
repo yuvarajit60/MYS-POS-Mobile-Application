@@ -9,18 +9,15 @@ public record LedgerEntryDto(
     decimal OutstandingAmount);
 
 /// <summary>
-/// One row of the all-customers ledger register, shown instead of a single
-/// customer's running ledger when no customer is selected in the filter.
-/// Unlike LedgerEntryDto's OutstandingAmount (a running balance within one
-/// customer's history), this one is row-level (TotalAmount - ReceivedAmount)
-/// since rows from different customers are interleaved chronologically —
-/// a running total across customers wouldn't mean anything.
+/// One row of the all-customers ledger summary, shown instead of a single
+/// customer's running ledger when no customer is selected in the filter —
+/// Qty/TotalAmount/ReceivedAmount/OutstandingAmount aggregated per Customer
+/// + TxnType (no per-transaction EntryDate/EntryNo — this is a summary, not
+/// a transaction register), sorted by customer name alphabetically.
 /// </summary>
 public record LedgerAllCustomersRowDto(
-    DateTime TxnDate,
     string CustomerName,
     string TxnType,
-    string TxnNo,
     decimal Qty,
     decimal TotalAmount,
     decimal ReceivedAmount,

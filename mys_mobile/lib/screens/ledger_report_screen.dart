@@ -16,10 +16,11 @@ import 'widgets/search_picker_sheet.dart';
 /// row still reflects the customer's entire history, not just the filtered
 /// window (see LedgerService).
 ///
-/// Customer is optional: leaving it blank shows a flat register of every
-/// transaction across every customer for the period (Tally "Ledger
-/// Vouchers"-style — Customer/Type/Qty/Total/Received/Outstanding, with a
-/// Report Totals footer) instead of one customer's running ledger.
+/// Customer is optional: leaving it blank shows a summary across every
+/// customer for the period — Qty/Total/Received/Outstanding aggregated per
+/// Customer + Type (no per-transaction date/entry no), sorted by customer
+/// name alphabetically, with a Report Total footer — instead of one
+/// customer's running ledger.
 class LedgerReportScreen extends StatefulWidget {
   const LedgerReportScreen({super.key});
 
@@ -272,14 +273,8 @@ class _LedgerReportScreenState extends State<LedgerReportScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text(row.customerName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                      Text(_dateFormat.format(row.txnDate), style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
-                  Text('${row.txnType}  •  ${row.txnNo}', style: Theme.of(context).textTheme.bodySmall),
+                  Text(row.customerName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(row.txnType, style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 8),
                   Row(
                     children: [

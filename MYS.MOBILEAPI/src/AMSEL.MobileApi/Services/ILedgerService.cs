@@ -24,9 +24,10 @@ public interface ILedgerService
 /// the balance on them. Cancelled Delivery/Payment rows (DD.CANCEL/
 /// PD.CANCEL) and cancelled Trip Entries (TE.CANCEL) are excluded.
 ///
-/// GetAllCustomersAsync backs the "no customer selected" view — a flat
-/// register of every transaction across every customer (Tally "Ledger
-/// Vouchers"-style), not one customer's running ledger.
+/// GetAllCustomersAsync backs the "no customer selected" view — Qty/
+/// TotalAmount/ReceivedAmount/OutstandingAmount summarized per Customer +
+/// TxnType (no per-transaction EntryDate/EntryNo), sorted by customer name
+/// alphabetically, rather than one customer's running ledger.
 /// </summary>
 public class LedgerService : ILedgerService
 {
@@ -61,23 +62,20 @@ public class LedgerService : ILedgerService
             """
             WITH DeliveryTxns AS (
                 SELECT
-                    DD.DELIVERYNO AS TXNNO,
-                    MIN(DD.DELIVERDATE) AS TXNDATE,
                     SO.CUSTOMERID,
                     'Delivery' AS TXNTYPE,
-                    SUM(DD.DELIVERYQTY) AS QTY,
-                    SUM((SOD.TOTALAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY) AS TOTALAMOUNT,
+                    DD.DELIVERYQTY AS QTY,
+                    (SOD.TOTALAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY AS TOTALAMOUNT,
                     CAST(0 AS NUMERIC(18,2)) AS RECEIVEDAMOUNT
                 FROM DELIVERY_DETAILS DD
                 INNER JOIN SALESORDER_DETAILS SOD ON SOD.SALESORDERDETID = DD.SALESORDERDETID
                 INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
                 WHERE SO.LOCATIONID = @LocationId AND (DD.CANCEL IS NULL OR DD.CANCEL = 0)
-                GROUP BY DD.DELIVERYNO, SO.CUSTOMERID
+                  AND (@FromDate IS NULL OR CAST(DD.DELIVERDATE AS DATE) >= @FromDate)
+                  AND (@ToDate IS NULL OR CAST(DD.DELIVERDATE AS DATE) <= @ToDate)
             ),
             TripTxns AS (
                 SELECT
-                    TE.ENTRYNO AS TXNNO,
-                    TE.TRIPDATE AS TXNDATE,
                     TE.CUSTOMERID,
                     'Trip Entry' AS TXNTYPE,
                     ISNULL((SELECT SUM(TD.QTY) FROM TRIPENTRY_DETAILS TD WHERE TD.TRIPENTRYID = TE.TRIPENTRYID), 0) AS QTY,
@@ -85,11 +83,11 @@ public class LedgerService : ILedgerService
                     CAST(0 AS NUMERIC(18,2)) AS RECEIVEDAMOUNT
                 FROM TRIPENTRY TE
                 WHERE TE.LOCATIONID = @LocationId AND TE.CANCEL = 0
+                  AND (@FromDate IS NULL OR CAST(TE.TRIPDATE AS DATE) >= @FromDate)
+                  AND (@ToDate IS NULL OR CAST(TE.TRIPDATE AS DATE) <= @ToDate)
             ),
             PaymentTxns AS (
                 SELECT
-                    PD.PAYMENTNO AS TXNNO,
-                    PD.PAYMENTDATE AS TXNDATE,
                     PD.CUSTOMERID,
                     'Payment' AS TXNTYPE,
                     CAST(0 AS NUMERIC(18,3)) AS QTY,
@@ -97,6 +95,8 @@ public class LedgerService : ILedgerService
                     PD.AMOUNT AS RECEIVEDAMOUNT
                 FROM PAYMENT_DETAILS PD
                 WHERE PD.LOCATIONID = @LocationId AND (PD.CANCEL IS NULL OR PD.CANCEL = 0)
+                  AND (@FromDate IS NULL OR CAST(PD.PAYMENTDATE AS DATE) >= @FromDate)
+                  AND (@ToDate IS NULL OR CAST(PD.PAYMENTDATE AS DATE) <= @ToDate)
             ),
             Combined AS (
                 SELECT * FROM DeliveryTxns
@@ -105,14 +105,13 @@ public class LedgerService : ILedgerService
                 UNION ALL
                 SELECT * FROM PaymentTxns
             )
-            SELECT C.TXNDATE AS TxnDate, ISNULL(CU.CUSTOMERNAME, '') AS CustomerName, C.TXNTYPE AS TxnType, C.TXNNO AS TxnNo,
-                   C.QTY AS Qty, C.TOTALAMOUNT AS TotalAmount, C.RECEIVEDAMOUNT AS ReceivedAmount,
-                   (C.TOTALAMOUNT - C.RECEIVEDAMOUNT) AS OutstandingAmount
+            SELECT ISNULL(CU.CUSTOMERNAME, '') AS CustomerName, C.TXNTYPE AS TxnType,
+                   SUM(C.QTY) AS Qty, SUM(C.TOTALAMOUNT) AS TotalAmount, SUM(C.RECEIVEDAMOUNT) AS ReceivedAmount,
+                   SUM(C.TOTALAMOUNT - C.RECEIVEDAMOUNT) AS OutstandingAmount
             FROM Combined C
             LEFT JOIN CUSTOMER CU ON CU.CUSTOMERID = C.CUSTOMERID
-            WHERE (@FromDate IS NULL OR CAST(C.TXNDATE AS DATE) >= @FromDate)
-              AND (@ToDate IS NULL OR CAST(C.TXNDATE AS DATE) <= @ToDate)
-            ORDER BY C.TXNDATE, CU.CUSTOMERNAME, C.TXNNO
+            GROUP BY CU.CUSTOMERNAME, C.TXNTYPE
+            ORDER BY CU.CUSTOMERNAME, C.TXNTYPE
             """,
             new { LocationId = locationId, FromDate = fromDate?.Date, ToDate = toDate?.Date });
 
