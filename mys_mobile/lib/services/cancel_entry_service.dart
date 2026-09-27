@@ -13,12 +13,16 @@ class CancelEntryService {
 
   Future<List<CancelEntryOption>> searchEntries({
     required String transactionType,
-    required DateTime date,
+    required DateTime fromDate,
+    required DateTime toDate,
+    int? customerId,
   }) async {
     try {
       final response = await ApiClient.instance.dio.get('/api/cancel-entries/options', queryParameters: {
         'transactionType': transactionType,
-        'date': _dateFormat.format(date),
+        'fromDate': _dateFormat.format(fromDate),
+        'toDate': _dateFormat.format(toDate),
+        'customerId': ?customerId,
       });
       return (response.data as List).map((e) => CancelEntryOption.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {

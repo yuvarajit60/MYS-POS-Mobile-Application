@@ -1,11 +1,20 @@
 class CancelEntryOption {
   final String entryNo;
-  final String description;
+  final String customerName;
+  final DateTime entryDate;
+  final double totalAmount;
 
-  CancelEntryOption({required this.entryNo, required this.description});
+  CancelEntryOption({
+    required this.entryNo,
+    required this.customerName,
+    required this.entryDate,
+    required this.totalAmount,
+  });
 
   factory CancelEntryOption.fromJson(Map<String, dynamic> json) => CancelEntryOption(
         entryNo: json['entryNo'] as String,
-        description: json['description'] as String? ?? '',
+        customerName: json['customerName'] as String? ?? '',
+        entryDate: DateTime.parse(json['entryDate'] as String),
+        totalAmount: (json['totalAmount'] as num).toDouble(),
       );
 }

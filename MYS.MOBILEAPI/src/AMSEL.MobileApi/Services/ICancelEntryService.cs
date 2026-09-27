@@ -6,7 +6,7 @@ namespace AMSEL.MobileApi.Services;
 
 public interface ICancelEntryService
 {
-    Task<IReadOnlyList<CancelEntryOptionDto>> SearchEntriesAsync(int locationId, string transactionType, DateTime date);
+    Task<IReadOnlyList<CancelEntryOptionDto>> SearchEntriesAsync(int locationId, string transactionType, DateTime fromDate, DateTime toDate, int? customerId);
     Task CancelAsync(int locationId, int userId, CancelEntryRequest request);
 }
 
@@ -44,51 +44,60 @@ public class CancelEntryService : ICancelEntryService
         _connectionFactory = connectionFactory;
     }
 
-    public async Task<IReadOnlyList<CancelEntryOptionDto>> SearchEntriesAsync(int locationId, string transactionType, DateTime date)
+    public async Task<IReadOnlyList<CancelEntryOptionDto>> SearchEntriesAsync(int locationId, string transactionType, DateTime fromDate, DateTime toDate, int? customerId)
     {
         using var connection = _connectionFactory.CreateConnection();
-        var d = date.Date;
-        var parameters = new { LocationId = locationId, Date = d };
+        var parameters = new { LocationId = locationId, FromDate = fromDate.Date, ToDate = toDate.Date, CustomerId = customerId };
 
         IEnumerable<CancelEntryOptionDto> rows = transactionType switch
         {
             SalesOrderType => await connection.QueryAsync<CancelEntryOptionDto>(
                 """
-                SELECT ENTRYNO AS EntryNo, ISNULL(CUSTOMERNAME, '') + '  -  ' + CAST(NETAMOUNT AS VARCHAR(30)) AS Description
+                SELECT ENTRYNO AS EntryNo, ISNULL(CUSTOMERNAME, '') AS CustomerName, ENTRYDATE AS EntryDate, NETAMOUNT AS TotalAmount
                 FROM SALESORDER
-                WHERE LOCATIONID = @LocationId AND CANCEL = 0 AND CAST(ENTRYDATE AS DATE) = @Date
-                ORDER BY ENTRYNO
+                WHERE LOCATIONID = @LocationId AND CANCEL = 0
+                  AND CAST(ENTRYDATE AS DATE) BETWEEN @FromDate AND @ToDate
+                  AND (@CustomerId IS NULL OR CUSTOMERID = @CustomerId)
+                ORDER BY ENTRYDATE DESC, ENTRYNO DESC
                 """,
                 parameters),
 
             TripEntryType => await connection.QueryAsync<CancelEntryOptionDto>(
                 """
-                SELECT TE.ENTRYNO AS EntryNo, ISNULL(C.CUSTOMERNAME, '') + '  -  ' + CAST(TE.NETAMOUNT AS VARCHAR(30)) AS Description
+                SELECT TE.ENTRYNO AS EntryNo, ISNULL(C.CUSTOMERNAME, '') AS CustomerName, TE.ENTRYDATE AS EntryDate, TE.NETAMOUNT AS TotalAmount
                 FROM TRIPENTRY TE
                 LEFT JOIN CUSTOMER C ON C.CUSTOMERID = TE.CUSTOMERID
-                WHERE TE.LOCATIONID = @LocationId AND TE.CANCEL = 0 AND CAST(TE.ENTRYDATE AS DATE) = @Date
-                ORDER BY TE.ENTRYNO
+                WHERE TE.LOCATIONID = @LocationId AND TE.CANCEL = 0
+                  AND CAST(TE.ENTRYDATE AS DATE) BETWEEN @FromDate AND @ToDate
+                  AND (@CustomerId IS NULL OR TE.CUSTOMERID = @CustomerId)
+                ORDER BY TE.ENTRYDATE DESC, TE.ENTRYNO DESC
                 """,
                 parameters),
 
             DeliveryType => await connection.QueryAsync<CancelEntryOptionDto>(
                 """
-                SELECT DD.DELIVERYNO AS EntryNo, ISNULL(MAX(SO.CUSTOMERNAME), '') AS Description
+                SELECT DD.DELIVERYNO AS EntryNo, ISNULL(MAX(SO.CUSTOMERNAME), '') AS CustomerName, MIN(DD.DELIVERDATE) AS EntryDate,
+                       SUM((SOD.TOTALAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY) AS TotalAmount
                 FROM DELIVERY_DETAILS DD
+                INNER JOIN SALESORDER_DETAILS SOD ON SOD.SALESORDERDETID = DD.SALESORDERDETID
                 INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
-                WHERE SO.LOCATIONID = @LocationId AND (DD.CANCEL IS NULL OR DD.CANCEL = 0) AND CAST(DD.DELIVERDATE AS DATE) = @Date
+                WHERE SO.LOCATIONID = @LocationId AND (DD.CANCEL IS NULL OR DD.CANCEL = 0)
+                  AND CAST(DD.DELIVERDATE AS DATE) BETWEEN @FromDate AND @ToDate
+                  AND (@CustomerId IS NULL OR SO.CUSTOMERID = @CustomerId)
                 GROUP BY DD.DELIVERYNO
-                ORDER BY DD.DELIVERYNO
+                ORDER BY MIN(DD.DELIVERDATE) DESC, DD.DELIVERYNO DESC
                 """,
                 parameters),
 
             PaymentType => await connection.QueryAsync<CancelEntryOptionDto>(
                 """
-                SELECT PD.PAYMENTNO AS EntryNo, ISNULL(C.CUSTOMERNAME, '') + '  -  ' + CAST(PD.AMOUNT AS VARCHAR(30)) AS Description
+                SELECT PD.PAYMENTNO AS EntryNo, ISNULL(C.CUSTOMERNAME, '') AS CustomerName, PD.PAYMENTDATE AS EntryDate, PD.AMOUNT AS TotalAmount
                 FROM PAYMENT_DETAILS PD
                 LEFT JOIN CUSTOMER C ON C.CUSTOMERID = PD.CUSTOMERID
-                WHERE PD.LOCATIONID = @LocationId AND (PD.CANCEL IS NULL OR PD.CANCEL = 0) AND CAST(PD.PAYMENTDATE AS DATE) = @Date
-                ORDER BY PD.PAYMENTNO
+                WHERE PD.LOCATIONID = @LocationId AND (PD.CANCEL IS NULL OR PD.CANCEL = 0)
+                  AND CAST(PD.PAYMENTDATE AS DATE) BETWEEN @FromDate AND @ToDate
+                  AND (@CustomerId IS NULL OR PD.CUSTOMERID = @CustomerId)
+                ORDER BY PD.PAYMENTDATE DESC, PD.PAYMENTNO DESC
                 """,
                 parameters),
 

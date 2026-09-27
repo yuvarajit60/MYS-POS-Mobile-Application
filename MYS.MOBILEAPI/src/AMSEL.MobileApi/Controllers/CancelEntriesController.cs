@@ -20,8 +20,8 @@ public class CancelEntriesController : ControllerBase
 
     [HttpGet("options")]
     public async Task<ActionResult<IReadOnlyList<CancelEntryOptionDto>>> SearchEntries(
-        [FromQuery] string transactionType, [FromQuery] DateTime date)
-        => Ok(await _cancelEntryService.SearchEntriesAsync(User.GetLocationId(), transactionType, date));
+        [FromQuery] string transactionType, [FromQuery] DateTime fromDate, [FromQuery] DateTime toDate, [FromQuery] int? customerId)
+        => Ok(await _cancelEntryService.SearchEntriesAsync(User.GetLocationId(), transactionType, fromDate, toDate, customerId));
 
     [HttpPost]
     public async Task<IActionResult> Cancel(CancelEntryRequest request)
