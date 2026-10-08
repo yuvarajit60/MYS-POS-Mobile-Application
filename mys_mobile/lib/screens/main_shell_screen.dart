@@ -4,6 +4,7 @@ import '../core/session.dart';
 import 'create_cancel_entry_screen.dart';
 import 'create_delivery_screen.dart';
 import 'create_payment_screen.dart';
+import 'create_sales_entry_screen.dart';
 import 'create_sales_order_screen.dart';
 import 'create_trip_entry_screen.dart';
 import 'delivery_reports_screen.dart';
@@ -71,6 +72,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.cancel_outlined,
           label: 'Cancel Entry',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateCancelEntryScreen())),
+        ),
+        ActionItem(
+          icon: Icons.receipt_long,
+          label: 'Sales Entry',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateSalesEntryScreen())),
         ),
       ];
 
