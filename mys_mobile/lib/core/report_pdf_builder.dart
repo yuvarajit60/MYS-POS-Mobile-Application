@@ -8,7 +8,9 @@ import '../models/ledger_all_customers_row.dart';
 import '../models/ledger_entry.dart';
 import '../models/order_detail.dart';
 import '../models/payment_report_entry.dart';
+import '../models/sales_detail.dart';
 import '../models/sales_order_summary.dart';
+import '../models/sales_summary.dart';
 import '../models/trip_entry_detail.dart';
 import '../models/trip_entry_line.dart';
 import '../models/trip_entry_summary.dart';
@@ -163,6 +165,153 @@ class ReportPdfBuilder {
                 pw.Text('Round Off: ${_amountFormat.format(order.roundOff)}', style: const pw.TextStyle(fontSize: 10)),
                 pw.SizedBox(height: 4),
                 pw.Text('Net Amount: ${_amountFormat.format(order.netAmount)}',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<pw.Document> buildSalesSummary({
+    required List<SalesSummary> rows,
+    required Company? company,
+    required String? customerName,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final doc = pw.Document();
+    final total = rows.fold<double>(0, (sum, r) => sum + r.netAmount);
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _companyHeader(company),
+            pw.SizedBox(height: 10),
+            pw.Text('Sales Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Period: ${_dateFormat.format(fromDate)} to ${_dateFormat.format(toDate)}'
+              '${customerName != null ? '   |   Customer: $customerName' : '   |   All Customers'}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.Divider(),
+          ],
+        ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Entry No', 'Date', 'Customer', 'Mobile', 'Net Amount'],
+            data: rows
+                .map((r) => [
+                      r.entryNo,
+                      _dateFormat.format(r.entryDate),
+                      r.customerName,
+                      r.mobileNo,
+                      _amountFormat.format(r.netAmount),
+                    ])
+                .toList(),
+            cellAlignments: {4: pw.Alignment.centerRight},
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Grand Total: ${_amountFormat.format(total)}',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<pw.Document> buildSalesDetail({
+    required SalesDetail sales,
+    required Company? company,
+  }) async {
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _companyHeader(company),
+            pw.SizedBox(height: 10),
+            pw.Text('Sales', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 8),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Customer', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      pw.Text(sales.customerName, style: const pw.TextStyle(fontSize: 10)),
+                      if (sales.mobileNo.isNotEmpty) pw.Text(sales.mobileNo, style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Entry No: ${sales.entryNo}', style: const pw.TextStyle(fontSize: 10)),
+                    pw.Text('Date: ${_dateFormat.format(sales.entryDate)}', style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+            pw.Divider(),
+          ],
+        ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Product', 'Qty', 'Rate', 'CGST', 'SGST', 'Amount'],
+            data: sales.lines
+                .map((l) => [
+                      l.productName,
+                      l.qty == l.qty.roundToDouble() ? l.qty.toInt().toString() : l.qty.toString(),
+                      _amountFormat.format(l.rate),
+                      _amountFormat.format(l.cgstAmount),
+                      _amountFormat.format(l.sgstAmount),
+                      _amountFormat.format(l.totalAmount),
+                    ])
+                .toList(),
+            cellAlignments: {
+              1: pw.Alignment.centerRight,
+              2: pw.Alignment.centerRight,
+              3: pw.Alignment.centerRight,
+              4: pw.Alignment.centerRight,
+              5: pw.Alignment.centerRight,
+            },
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text('Taxable Value: ${_amountFormat.format(sales.taxableValue)}', style: const pw.TextStyle(fontSize: 10)),
+                pw.Text('Total Tax: ${_amountFormat.format(sales.totalTax)}', style: const pw.TextStyle(fontSize: 10)),
+                pw.Text('Round Off: ${_amountFormat.format(sales.roundOff)}', style: const pw.TextStyle(fontSize: 10)),
+                pw.SizedBox(height: 4),
+                pw.Text('Net Amount: ${_amountFormat.format(sales.netAmount)}',
                     style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
               ],
             ),

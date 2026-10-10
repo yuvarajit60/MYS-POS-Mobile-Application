@@ -19,6 +19,7 @@ import 'manage_sites_screen.dart';
 import 'manage_vehicle_mappings_screen.dart';
 import 'payment_report_screen.dart';
 import 'reports_screen.dart';
+import 'sales_report_screen.dart';
 import 'trip_entry_reports_screen.dart';
 import 'widgets/action_item.dart';
 import 'widgets/category_panel.dart';
@@ -85,6 +86,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.assessment_outlined,
           label: 'Sales Order Report',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReportsScreen())),
+        ),
+        ActionItem(
+          icon: Icons.receipt_long,
+          label: 'Sales Report',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SalesReportScreen())),
         ),
         ActionItem(
           icon: Icons.receipt_long_outlined,
