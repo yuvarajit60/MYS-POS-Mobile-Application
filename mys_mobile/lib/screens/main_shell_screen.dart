@@ -3,6 +3,7 @@ import '../core/app_theme.dart';
 import '../core/session.dart';
 import 'create_cancel_entry_screen.dart';
 import 'create_delivery_screen.dart';
+import 'create_income_expense_screen.dart';
 import 'create_payment_screen.dart';
 import 'create_sales_entry_screen.dart';
 import 'create_sales_order_screen.dart';
@@ -78,6 +79,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.receipt_long,
           label: 'Sales Entry',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateSalesEntryScreen())),
+        ),
+        ActionItem(
+          icon: Icons.account_balance_outlined,
+          label: 'Income or Expenses',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateIncomeExpenseScreen())),
         ),
       ];
 
