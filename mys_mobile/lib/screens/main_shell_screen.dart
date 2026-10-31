@@ -9,6 +9,7 @@ import 'create_sales_entry_screen.dart';
 import 'create_sales_order_screen.dart';
 import 'create_trip_entry_screen.dart';
 import 'delivery_reports_screen.dart';
+import 'income_expense_report_screen.dart';
 import 'ledger_report_screen.dart';
 import 'login_screen.dart';
 import 'manage_areas_screen.dart';
@@ -117,6 +118,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.payments_outlined,
           label: 'Payment Report',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaymentReportScreen())),
+        ),
+        ActionItem(
+          icon: Icons.account_balance_outlined,
+          label: 'Income and Expenses Report',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IncomeExpenseReportScreen())),
         ),
       ];
 

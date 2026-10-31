@@ -63,6 +63,7 @@ builder.Services.AddScoped<ICancelEntryService, CancelEntryService>();
 builder.Services.AddScoped<ISalesEntryService, SalesEntryService>();
 builder.Services.AddScoped<ISalesReportService, SalesReportService>();
 builder.Services.AddScoped<IIncomeExpenseService, IncomeExpenseService>();
+builder.Services.AddScoped<IIncomeExpenseReportService, IncomeExpenseReportService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<ISmsGateway, SmsGateway>();

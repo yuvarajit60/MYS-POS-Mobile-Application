@@ -4,6 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/company.dart';
 import '../models/delivery_detail.dart';
 import '../models/delivery_summary.dart';
+import '../models/income_expense_summary.dart';
 import '../models/ledger_all_customers_row.dart';
 import '../models/ledger_entry.dart';
 import '../models/order_detail.dart';
@@ -879,6 +880,64 @@ class ReportPdfBuilder {
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Text('Total Amount: ${_amountFormat.format(total)}',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static Future<pw.Document> buildIncomeExpenseSummary({
+    required List<IncomeExpenseSummary> rows,
+    required Company? company,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    final doc = pw.Document();
+    final total = rows.fold<double>(0, (sum, r) => sum + r.amount);
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: _pageFormat,
+        margin: _margin,
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _companyHeader(company),
+            pw.SizedBox(height: 10),
+            pw.Text('Income and Expenses Report', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Period: ${_dateFormat.format(fromDate)} to ${_dateFormat.format(toDate)}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.Divider(),
+          ],
+        ),
+        build: (context) => [
+          pw.TableHelper.fromTextArray(
+            headers: ['Entry No', 'Date', 'Time', 'Type', 'Particulars', 'Amount'],
+            data: rows
+                .map((r) => [
+                      r.entryNo,
+                      _dateFormat.format(r.entryDate),
+                      _timeFormat.format(r.entryTime),
+                      r.incomeOrExpenses,
+                      r.particulars,
+                      _amountFormat.format(r.amount),
+                    ])
+                .toList(),
+            cellAlignments: {5: pw.Alignment.centerRight},
+            headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Grand Total: ${_amountFormat.format(total)}',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
           ),
         ],
