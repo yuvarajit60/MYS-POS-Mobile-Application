@@ -34,14 +34,17 @@ class SalesEntryService {
     }
   }
 
-  Future<String> create(List<SalesEntrySource> sources) async {
+  /// Each source becomes its own separate Sales entry — returns one entry
+  /// number per source, in the same order they were submitted.
+  Future<List<String>> create(List<SalesEntrySource> sources) async {
     try {
       final response = await ApiClient.instance.dio.post('/api/sales-entries', data: {
         'sources': sources.map((s) => {'sourceType': s.sourceType, 'entryNo': s.entryNo}).toList(),
       });
-      return (response.data as Map<String, dynamic>)['entryNo'] as String;
+      final entryNumbers = (response.data as Map<String, dynamic>)['entryNumbers'] as List;
+      return entryNumbers.cast<String>();
     } on DioException catch (e) {
-      throw SalesEntryServiceException(_messageFrom(e, 'Could not save the sales entry.'));
+      throw SalesEntryServiceException(_messageFrom(e, 'Could not save the sales entries.'));
     }
   }
 

@@ -1450,3 +1450,17 @@ GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'INCOMEOREXPENSES' AND COLUMN_NAME = 'VEHICLEID')
     ALTER TABLE dbo.INCOMEOREXPENSES ADD VEHICLEID INT NULL;
 GO
+
+------------------------------------------------------------
+-- Sales Entry per-source SALESID (folded in from
+-- 032_sales_entry_per_source.sql — see that file's header). Each
+-- Delivery/Trip Entry selected in Sales Entry now becomes its own
+-- separate dbo.SALES record, so SALESID is stamped back onto the source
+-- row for reports to join straight back to it.
+------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'DELIVERY_DETAILS' AND COLUMN_NAME = 'SALESID')
+    ALTER TABLE dbo.DELIVERY_DETAILS ADD SALESID INT NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TRIPENTRY' AND COLUMN_NAME = 'SALESID')
+    ALTER TABLE dbo.TRIPENTRY ADD SALESID INT NULL;
+GO

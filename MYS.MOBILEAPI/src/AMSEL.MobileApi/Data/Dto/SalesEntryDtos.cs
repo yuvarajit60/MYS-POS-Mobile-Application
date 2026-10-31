@@ -13,4 +13,4 @@ public record SalesEntrySourceDto(string SourceType, string EntryNo);
 
 public record CreateSalesEntryRequest(IReadOnlyList<SalesEntrySourceDto> Sources);
 
-public record CreateSalesEntryResponse(string EntryNo);
+public record CreateSalesEntryResponse(IReadOnlyList<string> EntryNumbers);

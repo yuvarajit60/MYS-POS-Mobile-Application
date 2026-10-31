@@ -18,22 +18,28 @@ public class InvalidSalesEntryException : Exception
 
 /// <summary>
 /// Sales Entry consolidates existing Delivery/Trip Entry activity (not yet
-/// invoiced — DELIVERY_DETAILS.ISSALES/TRIPENTRY.ISSALES = 0) into a formal
-/// dbo.SALES invoice, mirroring how the desktop app's own
+/// invoiced — DELIVERY_DETAILS.ISSALES/TRIPENTRY.ISSALES = 0) into formal
+/// dbo.SALES invoices, mirroring how the desktop app's own
 /// sp_SalesOrderTosales converts a Sales Order into a Sales invoice — same
 /// SALES/SALES_DETAILS tables and the same shared TRANSACTIONS 'SALES'
 /// sequence (dbo.SP_GENERATETRANNO), so mobile-created and desktop-created
 /// Sales entries interleave in one numbering series, same as every other
 /// entry type here.
 ///
+/// Each selected source becomes its own separate Sales entry (not one
+/// shared entry across the whole selection) — so no "all sources must
+/// share one customer" rule is needed, and each source's own SALESID is
+/// stamped back onto it (DELIVERY_DETAILS.SALESID / TRIPENTRY.SALESID, see
+/// 032_sales_entry_per_source.sql) for reports to join straight back to
+/// the Sales entry it became.
+///
 /// A Delivery's lines carry no amount of their own — SALES_DETAILS for a
 /// Delivery source is built by scaling each underlying SALESORDER_DETAILS
 /// line proportionally by (DELIVERYQTY / SALESQTY), the same math the
 /// Ledger and Cancel Entry already use. A Trip Entry's lines are copied
 /// straight from TRIPENTRY_DETAILS (already a complete, self-contained
-/// line). All selected sources must resolve to the same CUSTOMERID — a
-/// Sales invoice belongs to one customer — and each source is marked
-/// ISSALES = 1 once converted, so it can't be selected again.
+/// line). Each source is marked ISSALES = 1 once converted, so it can't be
+/// selected again.
 /// </summary>
 public class SalesEntryService : ISalesEntryService
 {
@@ -97,82 +103,71 @@ public class SalesEntryService : ISalesEntryService
         await connection.OpenAsync();
         using var transaction = connection.BeginTransaction();
 
-        int? customerId = null;
+        var entryNumbers = new List<string>();
+
         foreach (var source in request.Sources)
         {
-            int? rowCustomerId = source.SourceType switch
+            if (source.SourceType != DeliverySourceType && source.SourceType != TripEntrySourceType)
             {
-                DeliverySourceType => await connection.ExecuteScalarAsync<int?>(
+                transaction.Rollback();
+                throw new InvalidSalesEntryException($"Unknown source type \"{source.SourceType}\".");
+            }
+
+            var customerId = source.SourceType == DeliverySourceType
+                ? await connection.ExecuteScalarAsync<int?>(
                     """
                     SELECT TOP 1 SO.CUSTOMERID
                     FROM DELIVERY_DETAILS DD
                     INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
                     WHERE DD.DELIVERYNO = @EntryNo AND SO.LOCATIONID = @LocationId
                     """,
-                    new { source.EntryNo, LocationId = locationId }, transaction),
-
-                TripEntrySourceType => await connection.ExecuteScalarAsync<int?>(
+                    new { source.EntryNo, LocationId = locationId }, transaction)
+                : await connection.ExecuteScalarAsync<int?>(
                     "SELECT TOP 1 CUSTOMERID FROM TRIPENTRY WHERE ENTRYNO = @EntryNo AND LOCATIONID = @LocationId",
-                    new { source.EntryNo, LocationId = locationId }, transaction),
+                    new { source.EntryNo, LocationId = locationId }, transaction);
 
-                _ => throw new InvalidSalesEntryException($"Unknown source type \"{source.SourceType}\"."),
-            };
-
-            if (rowCustomerId is null)
+            if (customerId is null)
             {
                 transaction.Rollback();
                 throw new InvalidSalesEntryException($"{source.SourceType} entry \"{source.EntryNo}\" was not found.");
             }
 
-            if (customerId is null)
-            {
-                customerId = rowCustomerId;
-            }
-            else if (customerId != rowCustomerId)
-            {
-                transaction.Rollback();
-                throw new InvalidSalesEntryException("All selected entries must belong to the same customer.");
-            }
-        }
+            var customer = await connection.QueryFirstOrDefaultAsync(
+                "SELECT CUSTOMERNAME, MOBILENO FROM CUSTOMER WHERE CUSTOMERID = @CustomerId",
+                new { CustomerId = customerId }, transaction);
 
-        var customer = await connection.QueryFirstOrDefaultAsync(
-            "SELECT CUSTOMERNAME, MOBILENO FROM CUSTOMER WHERE CUSTOMERID = @CustomerId",
-            new { CustomerId = customerId }, transaction);
+            var genParams = new DynamicParameters();
+            genParams.Add("@TRANSACTIONNAME", "SALES");
+            genParams.Add("@TRANNO", dbType: DbType.String, direction: ParameterDirection.Output, size: -1);
+            genParams.Add("@USERSHORTNAME", "");
+            genParams.Add("@LOCATIONID", locationId);
+            await connection.ExecuteAsync("dbo.SP_GENERATETRANNO", genParams, transaction, commandType: CommandType.StoredProcedure);
+            var entryNo = genParams.Get<string?>("@TRANNO") ?? "";
 
-        var genParams = new DynamicParameters();
-        genParams.Add("@TRANSACTIONNAME", "SALES");
-        genParams.Add("@TRANNO", dbType: DbType.String, direction: ParameterDirection.Output, size: -1);
-        genParams.Add("@USERSHORTNAME", "");
-        genParams.Add("@LOCATIONID", locationId);
-        await connection.ExecuteAsync("dbo.SP_GENERATETRANNO", genParams, transaction, commandType: CommandType.StoredProcedure);
-        var entryNo = genParams.Get<string?>("@TRANNO") ?? "";
+            var salesId = await connection.QuerySingleAsync<int>(
+                """
+                INSERT INTO SALES
+                    (ENTRYNO, ENTRYDATE, SALESORDERID, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID,
+                     CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
+                     USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID, CUSTOMERNAME)
+                OUTPUT INSERTED.SALESID
+                VALUES
+                    (@EntryNo, GETDATE(), 0, @LocationId, 0, @MobileNo, @CustomerId,
+                     @LocationId, @LocationId, @UserId, @UserId,
+                     GETDATE(), GETDATE(), @EmployeeId, @EmployeeId, @CustomerName)
+                """,
+                new
+                {
+                    EntryNo = entryNo,
+                    LocationId = locationId,
+                    MobileNo = (string?)customer?.MOBILENO,
+                    CustomerId = customerId,
+                    UserId = userId,
+                    EmployeeId = employeeId,
+                    CustomerName = (string?)customer?.CUSTOMERNAME,
+                },
+                transaction);
 
-        var salesId = await connection.QuerySingleAsync<int>(
-            """
-            INSERT INTO SALES
-                (ENTRYNO, ENTRYDATE, SALESORDERID, LOCATIONID, COUNTERID, MOBILENO, CUSTOMERID,
-                 CREATEDLOCATIONID, MODIFYEDLOCATIONID, CREATEDUSERID, LASTMODIFYEDUSERID,
-                 USERCREATEDDATE, LASTMODIFYEDDATE, CREATEDEMPLOYEEID, MODIFYEDEMPLOYEEID, CUSTOMERNAME)
-            OUTPUT INSERTED.SALESID
-            VALUES
-                (@EntryNo, GETDATE(), 0, @LocationId, 0, @MobileNo, @CustomerId,
-                 @LocationId, @LocationId, @UserId, @UserId,
-                 GETDATE(), GETDATE(), @EmployeeId, @EmployeeId, @CustomerName)
-            """,
-            new
-            {
-                EntryNo = entryNo,
-                LocationId = locationId,
-                MobileNo = (string?)customer?.MOBILENO,
-                CustomerId = customerId,
-                UserId = userId,
-                EmployeeId = employeeId,
-                CustomerName = (string?)customer?.CUSTOMERNAME,
-            },
-            transaction);
-
-        foreach (var source in request.Sources)
-        {
             int linesInserted;
             if (source.SourceType == DeliverySourceType)
             {
@@ -212,7 +207,7 @@ public class SalesEntryService : ISalesEntryService
                     new { SalesId = salesId, source.EntryNo },
                     transaction);
             }
-            else if (source.SourceType == TripEntrySourceType)
+            else
             {
                 linesInserted = await connection.ExecuteAsync(
                     """
@@ -236,11 +231,6 @@ public class SalesEntryService : ISalesEntryService
                     new { SalesId = salesId, source.EntryNo, LocationId = locationId },
                     transaction);
             }
-            else
-            {
-                transaction.Rollback();
-                throw new InvalidSalesEntryException($"Unknown source type \"{source.SourceType}\".");
-            }
 
             if (linesInserted == 0)
             {
@@ -253,15 +243,15 @@ public class SalesEntryService : ISalesEntryService
             if (source.SourceType == DeliverySourceType)
             {
                 markedRows = await connection.ExecuteAsync(
-                    "UPDATE DELIVERY_DETAILS SET ISSALES = 1 WHERE DELIVERYNO = @EntryNo AND ISSALES = 0",
-                    new { source.EntryNo },
+                    "UPDATE DELIVERY_DETAILS SET ISSALES = 1, SALESID = @SalesId WHERE DELIVERYNO = @EntryNo AND ISSALES = 0",
+                    new { SalesId = salesId, source.EntryNo },
                     transaction);
             }
             else
             {
                 markedRows = await connection.ExecuteAsync(
-                    "UPDATE TRIPENTRY SET ISSALES = 1 WHERE ENTRYNO = @EntryNo AND LOCATIONID = @LocationId AND ISSALES = 0",
-                    new { source.EntryNo, LocationId = locationId },
+                    "UPDATE TRIPENTRY SET ISSALES = 1, SALESID = @SalesId WHERE ENTRYNO = @EntryNo AND LOCATIONID = @LocationId AND ISSALES = 0",
+                    new { SalesId = salesId, source.EntryNo, LocationId = locationId },
                     transaction);
             }
 
@@ -270,27 +260,29 @@ public class SalesEntryService : ISalesEntryService
                 transaction.Rollback();
                 throw new InvalidSalesEntryException($"Could not mark {source.SourceType} entry \"{source.EntryNo}\" as sold.");
             }
-        }
 
-        await connection.ExecuteAsync(
-            """
-            UPDATE SALES
-            SET TAXABLEVALUE = T.TaxableValue, TOTALTAX = T.TotalTax, ITEMVALUE = T.ItemValue,
-                DISCOUNTAMOUNT = T.DiscountAmount, NETAMOUNT = T.NetAmount
-            FROM SALES S
-            CROSS APPLY (
-                SELECT ISNULL(SUM(SD.TAXABLEVALUE), 0) AS TaxableValue, ISNULL(SUM(SD.TOTALTAX), 0) AS TotalTax,
-                       ISNULL(SUM(SD.GROSSAMOUNT), 0) AS ItemValue, ISNULL(SUM(SD.DISCOUNTAMOUNT), 0) AS DiscountAmount,
-                       ISNULL(SUM(SD.TOTALAMOUNT), 0) AS NetAmount
-                FROM SALES_DETAILS SD WHERE SD.SALESID = S.SALESID
-            ) T
-            WHERE S.SALESID = @SalesId
-            """,
-            new { SalesId = salesId },
-            transaction);
+            await connection.ExecuteAsync(
+                """
+                UPDATE SALES
+                SET TAXABLEVALUE = T.TaxableValue, TOTALTAX = T.TotalTax, ITEMVALUE = T.ItemValue,
+                    DISCOUNTAMOUNT = T.DiscountAmount, NETAMOUNT = T.NetAmount
+                FROM SALES S
+                CROSS APPLY (
+                    SELECT ISNULL(SUM(SD.TAXABLEVALUE), 0) AS TaxableValue, ISNULL(SUM(SD.TOTALTAX), 0) AS TotalTax,
+                           ISNULL(SUM(SD.GROSSAMOUNT), 0) AS ItemValue, ISNULL(SUM(SD.DISCOUNTAMOUNT), 0) AS DiscountAmount,
+                           ISNULL(SUM(SD.TOTALAMOUNT), 0) AS NetAmount
+                    FROM SALES_DETAILS SD WHERE SD.SALESID = S.SALESID
+                ) T
+                WHERE S.SALESID = @SalesId
+                """,
+                new { SalesId = salesId },
+                transaction);
+
+            entryNumbers.Add(entryNo);
+        }
 
         transaction.Commit();
 
-        return new CreateSalesEntryResponse(entryNo);
+        return new CreateSalesEntryResponse(entryNumbers);
     }
 }

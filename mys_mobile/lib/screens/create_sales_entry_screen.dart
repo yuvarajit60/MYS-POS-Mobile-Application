@@ -7,12 +7,12 @@ import '../services/sales_entry_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
 /// Consolidates existing Delivery/Trip Entry activity (not yet invoiced)
-/// into a formal Sales entry — mirrors the desktop app's own Sales Order ->
-/// Sales conversion, just sourced from Delivery/Trip Entry instead.
-/// Customer is optional: leaving it blank lists every customer's pending
-/// entries, but only one customer's entries can be selected per Sales
-/// entry (a Sales invoice belongs to one customer) — picking a row locks
-/// selection to that row's customer until cleared.
+/// into formal Sales entries — mirrors the desktop app's own Sales Order ->
+/// Sales conversion, just sourced from Delivery/Trip Entry instead. Each
+/// selected row becomes its own separate Sales entry (not one shared
+/// entry across the whole selection), so rows from different customers
+/// can be checked together in one batch — Customer is just an optional
+/// filter on the grid, not a constraint on what can be selected.
 class CreateSalesEntryScreen extends StatefulWidget {
   const CreateSalesEntryScreen({super.key});
 
@@ -37,14 +37,6 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
   final Set<String> _selectedKeys = {};
 
   String _keyOf(SalesEntryOption o) => '${o.sourceType}|${o.entryNo}';
-
-  String? get _lockedCustomerName {
-    if (_selectedKeys.isEmpty || _results == null) return null;
-    for (final o in _results!) {
-      if (_selectedKeys.contains(_keyOf(o))) return o.customerName;
-    }
-    return null;
-  }
 
   double get _grandTotal => (_results ?? [])
       .where((o) => _selectedKeys.contains(_keyOf(o)))
@@ -115,11 +107,14 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
 
     setState(() => _saving = true);
     try {
-      final entryNo = await _salesEntryService.create(
+      final entryNumbers = await _salesEntryService.create(
         selected.map((o) => SalesEntrySource(sourceType: o.sourceType, entryNo: o.entryNo)).toList(),
       );
       if (!mounted) return;
-      _showMessage('Sales entry $entryNo saved.');
+      final message = entryNumbers.length == 1
+          ? 'Sales entry ${entryNumbers.first} saved.'
+          : '${entryNumbers.length} sales entries saved: ${entryNumbers.join(', ')}';
+      _showMessage(message);
       Navigator.of(context).pop();
     } on SalesEntryServiceException catch (e) {
       _showMessage(e.message);
@@ -228,8 +223,6 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
     final results = _results!;
     if (results.isEmpty) return const Center(child: Text('No pending Delivery/Trip Entry entries found for this filter.'));
 
-    final lockedCustomer = _lockedCustomerName;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -238,9 +231,7 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
             color: option.customerHasGst ? Colors.amber.shade50 : null,
             child: CheckboxListTile(
               value: _selectedKeys.contains(_keyOf(option)),
-              onChanged: busy || (lockedCustomer != null && lockedCustomer != option.customerName)
-                  ? null
-                  : (checked) => _toggle(option, checked),
+              onChanged: busy ? null : (checked) => _toggle(option, checked),
               title: Text('${option.entryNo}  (${option.sourceType})'),
               subtitle: Text(
                 '${option.customerName}${option.customerHasGst ? '  •  GST' : ''}\n'
