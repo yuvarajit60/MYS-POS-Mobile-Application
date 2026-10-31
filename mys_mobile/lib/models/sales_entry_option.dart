@@ -6,6 +6,7 @@ class SalesEntryOption {
   final double totalQty;
   final double totalAmount;
   final bool customerHasGst;
+  final int? tripEntryId;
 
   SalesEntryOption({
     required this.sourceType,
@@ -15,6 +16,7 @@ class SalesEntryOption {
     required this.totalQty,
     required this.totalAmount,
     required this.customerHasGst,
+    required this.tripEntryId,
   });
 
   factory SalesEntryOption.fromJson(Map<String, dynamic> json) => SalesEntryOption(
@@ -25,5 +27,6 @@ class SalesEntryOption {
         totalQty: (json['totalQty'] as num).toDouble(),
         totalAmount: (json['totalAmount'] as num).toDouble(),
         customerHasGst: json['customerHasGst'] as bool,
+        tripEntryId: json['tripEntryId'] as int?,
       );
 }

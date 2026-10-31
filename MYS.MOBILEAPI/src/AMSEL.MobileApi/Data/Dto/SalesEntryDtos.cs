@@ -7,7 +7,8 @@ public record SalesEntryOptionDto(
     DateTime EntryDate,
     decimal TotalQty,
     decimal TotalAmount,
-    bool CustomerHasGst);
+    bool CustomerHasGst,
+    int? TripEntryId);
 
 public record SalesEntrySourceDto(string SourceType, string EntryNo);
 

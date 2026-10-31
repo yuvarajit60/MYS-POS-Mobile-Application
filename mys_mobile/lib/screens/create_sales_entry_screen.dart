@@ -4,6 +4,8 @@ import '../models/customer.dart';
 import '../models/sales_entry_option.dart';
 import '../services/customer_service.dart';
 import '../services/sales_entry_service.dart';
+import 'delivery_detail_screen.dart';
+import 'trip_entry_detail_screen.dart';
 import 'widgets/search_picker_sheet.dart';
 
 /// Consolidates existing Delivery/Trip Entry activity (not yet invoiced)
@@ -84,6 +86,14 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _viewDetail(SalesEntryOption option) {
+    if (option.sourceType == 'Delivery') {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeliveryDetailScreen(deliveryNo: option.entryNo)));
+    } else {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripEntryDetailScreen(tripEntryId: option.tripEntryId!)));
     }
   }
 
@@ -232,7 +242,19 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
             child: CheckboxListTile(
               value: _selectedKeys.contains(_keyOf(option)),
               onChanged: busy ? null : (checked) => _toggle(option, checked),
-              title: Text('${option.entryNo}  (${option.sourceType})'),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: busy ? null : () => _viewDetail(option),
+                    child: Text(
+                      option.entryNo,
+                      style: const TextStyle(decoration: TextDecoration.underline),
+                    ),
+                  ),
+                  Text('  (${option.sourceType})'),
+                ],
+              ),
               subtitle: Text(
                 '${option.customerName}${option.customerHasGst ? '  •  GST' : ''}\n'
                 '${_dateFormat.format(option.entryDate)}   Qty: ${_amountFormat.format(option.totalQty)}',

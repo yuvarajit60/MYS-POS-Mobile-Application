@@ -62,7 +62,8 @@ public class SalesEntryService : ISalesEntryService
                 SELECT 'Delivery' AS SourceType, DD.DELIVERYNO AS EntryNo, ISNULL(MAX(SO.CUSTOMERNAME), '') AS CustomerName,
                        MIN(DD.DELIVERDATE) AS EntryDate, SUM(DD.DELIVERYQTY) AS TotalQty,
                        SUM((SOD.TOTALAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY) AS TotalAmount,
-                       CAST(MAX(CASE WHEN C.GSTIN IS NOT NULL AND LTRIM(RTRIM(C.GSTIN)) <> '' THEN 1 ELSE 0 END) AS BIT) AS CustomerHasGst
+                       CAST(MAX(CASE WHEN C.GSTIN IS NOT NULL AND LTRIM(RTRIM(C.GSTIN)) <> '' THEN 1 ELSE 0 END) AS BIT) AS CustomerHasGst,
+                       CAST(NULL AS INT) AS TripEntryId
                 FROM DELIVERY_DETAILS DD
                 INNER JOIN SALESORDER_DETAILS SOD ON SOD.SALESORDERDETID = DD.SALESORDERDETID
                 INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
@@ -77,7 +78,8 @@ public class SalesEntryService : ISalesEntryService
                        TE.ENTRYDATE AS EntryDate,
                        ISNULL((SELECT SUM(TD.QTY) FROM TRIPENTRY_DETAILS TD WHERE TD.TRIPENTRYID = TE.TRIPENTRYID), 0) AS TotalQty,
                        TE.NETAMOUNT AS TotalAmount,
-                       CAST(CASE WHEN C.GSTIN IS NOT NULL AND LTRIM(RTRIM(C.GSTIN)) <> '' THEN 1 ELSE 0 END AS BIT) AS CustomerHasGst
+                       CAST(CASE WHEN C.GSTIN IS NOT NULL AND LTRIM(RTRIM(C.GSTIN)) <> '' THEN 1 ELSE 0 END AS BIT) AS CustomerHasGst,
+                       TE.TRIPENTRYID AS TripEntryId
                 FROM TRIPENTRY TE
                 LEFT JOIN CUSTOMER C ON C.CUSTOMERID = TE.CUSTOMERID
                 WHERE TE.LOCATIONID = @LocationId AND TE.CANCEL = 0 AND TE.ISSALES = 0
