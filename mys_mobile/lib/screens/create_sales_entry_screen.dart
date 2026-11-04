@@ -242,18 +242,15 @@ class _CreateSalesEntryScreenState extends State<CreateSalesEntryScreen> {
             child: CheckboxListTile(
               value: _selectedKeys.contains(_keyOf(option)),
               onChanged: busy ? null : (checked) => _toggle(option, checked),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: busy ? null : () => _viewDetail(option),
-                    child: Text(
-                      option.entryNo,
-                      style: const TextStyle(decoration: TextDecoration.underline),
-                    ),
+              title: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: busy ? null : () => _viewDetail(option),
+                  child: Text(
+                    option.entryNo,
+                    style: const TextStyle(decoration: TextDecoration.underline),
                   ),
-                  Text('  (${option.sourceType})'),
-                ],
+                ),
               ),
               subtitle: Text(
                 '${option.customerName}${option.customerHasGst ? '  •  GST' : ''}\n'
