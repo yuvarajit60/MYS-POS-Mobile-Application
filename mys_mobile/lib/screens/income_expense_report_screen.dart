@@ -9,10 +9,13 @@ import '../services/income_expense_report_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
 /// Flat list of dbo.INCOMEOREXPENSES rows — mirrors the desktop app's own
-/// "Income And Expense Document" report (Entry No/Date/Time/Type/
-/// Particulars/Amount, Grand Total = sum of every row regardless of
-/// Income vs Expenses). No line items on this table, so no drill-down
-/// detail screen, same as Payment Report.
+/// "Income And Expense Document" report columns (Entry No/Date/Time/Type/
+/// Particulars/Amount), plus a running Balance per row where Income adds
+/// and Expenses subtracts from the previous entry (see
+/// IncomeExpenseReportService), replacing the old flat "Grand Total = sum
+/// of every row regardless of type" with a proper Net Total. No line
+/// items on this table, so no drill-down detail screen, same as Payment
+/// Report.
 class IncomeExpenseReportScreen extends StatefulWidget {
   const IncomeExpenseReportScreen({super.key});
 
@@ -32,8 +35,6 @@ class _IncomeExpenseReportScreenState extends State<IncomeExpenseReportScreen> {
   bool _loading = false;
   String? _error;
   List<IncomeExpenseSummary>? _rows;
-
-  double get _total => _rows?.fold<double>(0, (sum, r) => sum + r.amount) ?? 0;
 
   @override
   void initState() {
@@ -202,6 +203,8 @@ class _IncomeExpenseReportScreenState extends State<IncomeExpenseReportScreen> {
     final rows = _rows!;
     if (rows.isEmpty) return const Center(child: Text('No entries found for this period.'));
 
+    final netTotal = rows.first.runningBalance;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -222,15 +225,25 @@ class _IncomeExpenseReportScreenState extends State<IncomeExpenseReportScreen> {
                 '${_dateFormat.format(row.entryDate)}  ${_timeFormat.format(row.entryTime)}',
               ),
               isThreeLine: true,
-              trailing: Text(row.amount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(row.amount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Bal: ${row.runningBalance.toStringAsFixed(2)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ),
         const Divider(),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(_total.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Net Total', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(netTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
       ],

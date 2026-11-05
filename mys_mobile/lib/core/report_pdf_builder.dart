@@ -896,7 +896,7 @@ class ReportPdfBuilder {
     required DateTime toDate,
   }) async {
     final doc = pw.Document();
-    final total = rows.fold<double>(0, (sum, r) => sum + r.amount);
+    final netTotal = rows.isEmpty ? 0.0 : rows.first.runningBalance;
 
     doc.addPage(
       pw.MultiPage(
@@ -918,7 +918,7 @@ class ReportPdfBuilder {
         ),
         build: (context) => [
           pw.TableHelper.fromTextArray(
-            headers: ['Entry No', 'Date', 'Time', 'Type', 'Particulars', 'Amount'],
+            headers: ['Entry No', 'Date', 'Time', 'Type', 'Particulars', 'Amount', 'Balance'],
             data: rows
                 .map((r) => [
                       r.entryNo,
@@ -927,9 +927,10 @@ class ReportPdfBuilder {
                       r.incomeOrExpenses,
                       r.particulars,
                       _amountFormat.format(r.amount),
+                      _amountFormat.format(r.runningBalance),
                     ])
                 .toList(),
-            cellAlignments: {5: pw.Alignment.centerRight},
+            cellAlignments: {5: pw.Alignment.centerRight, 6: pw.Alignment.centerRight},
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
             cellStyle: const pw.TextStyle(fontSize: 9),
@@ -937,7 +938,7 @@ class ReportPdfBuilder {
           pw.SizedBox(height: 12),
           pw.Align(
             alignment: pw.Alignment.centerRight,
-            child: pw.Text('Grand Total: ${_amountFormat.format(total)}',
+            child: pw.Text('Net Total: ${_amountFormat.format(netTotal)}',
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
           ),
         ],

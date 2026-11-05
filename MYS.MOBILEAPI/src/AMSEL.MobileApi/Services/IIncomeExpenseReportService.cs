@@ -13,10 +13,16 @@ public interface IIncomeExpenseReportService
 /// <summary>
 /// Flat list of dbo.INCOMEOREXPENSES rows (see Income or Expenses) —
 /// mirrors the desktop app's own "Income And Expense Document" report
-/// (same columns: Entry No/Date/Time/Type/Particulars/Amount, same Grand
-/// Total = sum of every row regardless of Income vs Expenses). No line
-/// items on this table, so a plain parameterized query is enough — no
-/// stored procedure and no drill-down detail screen needed.
+/// columns (Entry No/Date/Time/Type/Particulars/Amount), plus a mobile-only
+/// RunningBalance per row (Income adds, Expenses subtracts from the
+/// previous entry — same idea as the Customer Ledger's OUTSTANDINGAMOUNT,
+/// see SP_MOBILE_GET_CUSTOMER_LEDGER), replacing the old "Grand Total =
+/// sum of every row regardless of type" with a proper net total. The
+/// running balance is computed chronologically (oldest first) over the
+/// filtered rows, then the result is still returned newest-first to match
+/// the existing report order — so the first row's balance is the period's
+/// Net Total. No line items on this table, so a plain parameterized query
+/// is enough — no stored procedure and no drill-down detail screen needed.
 /// </summary>
 public class IncomeExpenseReportService : IIncomeExpenseReportService
 {
@@ -34,15 +40,29 @@ public class IncomeExpenseReportService : IIncomeExpenseReportService
         var like = $"%{entryNo}%";
         var rows = await connection.QueryAsync<IncomeExpenseSummaryDto>(
             """
-            SELECT IE.ENTRYNO AS EntryNo, IE.ENTRYDATE AS EntryDate, IE.ENTRYTIME AS EntryTime,
-                   ISNULL(IE.INCOMEOREXPENSES, '') AS IncomeOrExpenses, ISNULL(IE.PARTICULARS, '') AS Particulars,
-                   IE.AMOUNT AS Amount
-            FROM INCOMEOREXPENSES IE
-            WHERE IE.LOCATIONID = @LocationId
-              AND IE.CANCEL = 0
-              AND CAST(IE.ENTRYDATE AS DATE) BETWEEN @FromDate AND @ToDate
-              AND (@EntryNo IS NULL OR IE.ENTRYNO LIKE @Like)
-            ORDER BY IE.ENTRYDATE DESC, IE.INCOMEOREXPENSESID DESC
+            ;WITH Filtered AS (
+                SELECT IE.INCOMEOREXPENSESID, IE.ENTRYNO, IE.ENTRYDATE, IE.ENTRYTIME,
+                       ISNULL(IE.INCOMEOREXPENSES, '') AS INCOMEOREXPENSES, ISNULL(IE.PARTICULARS, '') AS PARTICULARS,
+                       IE.AMOUNT
+                FROM INCOMEOREXPENSES IE
+                WHERE IE.LOCATIONID = @LocationId
+                  AND IE.CANCEL = 0
+                  AND CAST(IE.ENTRYDATE AS DATE) BETWEEN @FromDate AND @ToDate
+                  AND (@EntryNo IS NULL OR IE.ENTRYNO LIKE @Like)
+            ),
+            Running AS (
+                SELECT *,
+                    SUM(CASE WHEN INCOMEOREXPENSES = 'Income' THEN AMOUNT ELSE -AMOUNT END) OVER (
+                        ORDER BY ENTRYDATE, ENTRYTIME, INCOMEOREXPENSESID
+                        ROWS UNBOUNDED PRECEDING
+                    ) AS RUNNINGBALANCE
+                FROM Filtered
+            )
+            SELECT ENTRYNO AS EntryNo, ENTRYDATE AS EntryDate, ENTRYTIME AS EntryTime,
+                   INCOMEOREXPENSES AS IncomeOrExpenses, PARTICULARS AS Particulars, AMOUNT AS Amount,
+                   RUNNINGBALANCE AS RunningBalance
+            FROM Running
+            ORDER BY ENTRYDATE DESC, ENTRYTIME DESC, INCOMEOREXPENSESID DESC
             """,
             new
             {

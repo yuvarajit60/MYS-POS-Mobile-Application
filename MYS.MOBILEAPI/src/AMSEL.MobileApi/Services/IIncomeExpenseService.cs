@@ -22,18 +22,20 @@ public class InvalidIncomeExpenseException : Exception
 /// TRANSACTIONS 'INCOMEOREXPENSES' sequence (dbo.SP_GENERATETRANNO).
 ///
 /// Desktop only ever free-types PARTICULARS (e.g. "KUMAR ADVANCE"). The
-/// mobile app instead picks a structured Employee when the Head is
-/// "SALARY ADVANCE" and a structured Vehicle when the Head is "FUEL",
-/// storing the id in the new EMPLOYEEID/VEHICLEID columns (see
-/// 031_income_or_expenses.sql) while still composing a sensible
-/// PARTICULARS string ("{Name} {typed particulars}") so the entry still
-/// reads naturally on the desktop side, which knows nothing about the new
-/// columns.
+/// mobile app instead picks a structured Employee/Vehicle when the
+/// selected Head's HEAD.MAPPEDMASTER says so (see Head Master,
+/// 033_head_mapped_master.sql — e.g. "SALARY ADVANCE" is mapped to
+/// "Employee", "FUEL" to "Vehicle"), storing the id in the EMPLOYEEID/
+/// VEHICLEID columns (031_income_or_expenses.sql) while still composing a
+/// sensible PARTICULARS string ("{Name} {typed particulars}") so the
+/// entry still reads naturally on the desktop side, which knows nothing
+/// about either new column. Which Head needs which picker is entirely
+/// data (Head Master), not hardcoded here.
 /// </summary>
 public class IncomeExpenseService : IIncomeExpenseService
 {
-    private const string SalaryAdvanceHead = "SALARY ADVANCE";
-    private const string FuelHead = "FUEL";
+    private const string EmployeeMappedMaster = "Employee";
+    private const string VehicleMappedMaster = "Vehicle";
 
     private readonly ISqlConnectionFactory _connectionFactory;
 
@@ -47,7 +49,8 @@ public class IncomeExpenseService : IIncomeExpenseService
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<HeadDto>(
             """
-            SELECT HEADID AS HeadId, ISNULL(HEADNAME, '') AS HeadName, ISNULL(INCOMEOREXPENSES, '') AS IncomeOrExpenses
+            SELECT HEADID AS HeadId, ISNULL(HEADNAME, '') AS HeadName, ISNULL(INCOMEOREXPENSES, '') AS IncomeOrExpenses,
+                   MAPPEDMASTER AS MappedMaster
             FROM HEAD
             WHERE STATUS = 1
               AND (@IncomeOrExpenses IS NULL OR INCOMEOREXPENSES = @IncomeOrExpenses)
@@ -67,26 +70,25 @@ public class IncomeExpenseService : IIncomeExpenseService
         await connection.OpenAsync();
         using var transaction = connection.BeginTransaction();
 
-        var headName = await connection.ExecuteScalarAsync<string?>(
-            "SELECT HEADNAME FROM HEAD WHERE HEADID = @HeadId AND STATUS = 1",
+        var head = await connection.QueryFirstOrDefaultAsync<(string? HeadName, string? MappedMaster)>(
+            "SELECT HEADNAME AS HeadName, MAPPEDMASTER AS MappedMaster FROM HEAD WHERE HEADID = @HeadId AND STATUS = 1",
             new { request.HeadId }, transaction);
 
-        if (headName is null)
+        if (head.HeadName is null)
         {
             transaction.Rollback();
             throw new InvalidIncomeExpenseException("Select a valid head.");
         }
 
-        var trimmedHeadName = headName.Trim();
         string? employeeName = null;
         string? vehicleName = null;
 
-        if (string.Equals(trimmedHeadName, SalaryAdvanceHead, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(head.MappedMaster, EmployeeMappedMaster, StringComparison.OrdinalIgnoreCase))
         {
             if (request.EmployeeId is null)
             {
                 transaction.Rollback();
-                throw new InvalidIncomeExpenseException("Select an employee for Salary Advance.");
+                throw new InvalidIncomeExpenseException("Select an employee for this head.");
             }
 
             employeeName = await connection.ExecuteScalarAsync<string?>(
@@ -99,12 +101,12 @@ public class IncomeExpenseService : IIncomeExpenseService
                 throw new InvalidIncomeExpenseException("Selected employee was not found.");
             }
         }
-        else if (string.Equals(trimmedHeadName, FuelHead, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(head.MappedMaster, VehicleMappedMaster, StringComparison.OrdinalIgnoreCase))
         {
             if (request.VehicleId is null)
             {
                 transaction.Rollback();
-                throw new InvalidIncomeExpenseException("Select a vehicle for Fuel.");
+                throw new InvalidIncomeExpenseException("Select a vehicle for this head.");
             }
 
             vehicleName = await connection.ExecuteScalarAsync<string?>(

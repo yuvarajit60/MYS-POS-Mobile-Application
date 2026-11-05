@@ -1,6 +1,6 @@
 namespace AMSEL.MobileApi.Data.Dto;
 
-public record HeadDto(int HeadId, string HeadName, string IncomeOrExpenses);
+public record HeadDto(int HeadId, string HeadName, string IncomeOrExpenses, string? MappedMaster);
 
 public record CreateIncomeExpenseRequest(
     DateTime EntryDate,

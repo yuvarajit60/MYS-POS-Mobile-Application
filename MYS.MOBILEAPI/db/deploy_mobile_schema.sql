@@ -1373,6 +1373,9 @@ GO
 -- created here where missing (the sandbox, seeded with the 13 HEAD rows
 -- from the desktop reference). EMPLOYEEID/VEHICLEID added to
 -- INCOMEOREXPENSES for the mobile-only Salary Advance/Fuel pickers.
+-- MAPPEDMASTER (folded in from 033_head_mapped_master.sql — see that
+-- file's header) replaces that hardcoding with Head Master data: which
+-- other master table ("Employee"/"Vehicle") a Head pulls a picker from.
 ------------------------------------------------------------
 IF OBJECT_ID(N'dbo.HEAD', N'U') IS NULL
 BEGIN
@@ -1382,6 +1385,7 @@ BEGIN
         HEADNAME            VARCHAR(50) NULL,
         PRINTNAME           VARCHAR(50) NULL,
         INCOMEOREXPENSES    VARCHAR(30) NULL,
+        MAPPEDMASTER        VARCHAR(20) NULL,
         STATUS              BIT NOT NULL CONSTRAINT DF_HEAD_STATUS DEFAULT 1,
         CREATEDLOCATIONID   INT NOT NULL CONSTRAINT DF_HEAD_CREATEDLOCATIONID DEFAULT 0,
         MODIFYEDLOCATIONID  INT NOT NULL CONSTRAINT DF_HEAD_MODIFYEDLOCATIONID DEFAULT 0,
@@ -1449,6 +1453,14 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'INCO
 GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'INCOMEOREXPENSES' AND COLUMN_NAME = 'VEHICLEID')
     ALTER TABLE dbo.INCOMEOREXPENSES ADD VEHICLEID INT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'HEAD' AND COLUMN_NAME = 'MAPPEDMASTER')
+    ALTER TABLE dbo.HEAD ADD MAPPEDMASTER VARCHAR(20) NULL;
+GO
+
+UPDATE dbo.HEAD SET MAPPEDMASTER = 'Employee' WHERE HEADNAME = 'SALARY ADVANCE' AND MAPPEDMASTER IS NULL;
+UPDATE dbo.HEAD SET MAPPEDMASTER = 'Vehicle' WHERE HEADNAME = 'FUEL' AND MAPPEDMASTER IS NULL;
 GO
 
 ------------------------------------------------------------

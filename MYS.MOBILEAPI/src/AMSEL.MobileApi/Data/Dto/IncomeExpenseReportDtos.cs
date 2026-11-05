@@ -6,6 +6,7 @@ public record IncomeExpenseSummaryDto(
     DateTime EntryTime,
     string IncomeOrExpenses,
     string Particulars,
-    decimal Amount);
+    decimal Amount,
+    decimal RunningBalance);
 
 public record IncomeExpenseEntryNumberDto(int IncomeOrExpensesId, string EntryNo);

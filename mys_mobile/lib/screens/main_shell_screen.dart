@@ -16,6 +16,7 @@ import 'manage_areas_screen.dart';
 import 'manage_customer_site_mappings_screen.dart';
 import 'manage_customers_screen.dart';
 import 'manage_employees_screen.dart';
+import 'manage_heads_screen.dart';
 import 'manage_products_screen.dart';
 import 'manage_sites_screen.dart';
 import 'manage_vehicle_mappings_screen.dart';
@@ -161,6 +162,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
           icon: Icons.badge_outlined,
           label: 'Employee',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageEmployeesScreen())),
+        ),
+        ActionItem(
+          icon: Icons.account_balance_wallet_outlined,
+          label: 'Head Master',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageHeadsScreen())),
         ),
       ];
 

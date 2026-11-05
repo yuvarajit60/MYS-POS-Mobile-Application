@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../core/current_date_provider.dart';
 import '../models/employee.dart';
 import '../models/head.dart';
 import '../models/vehicle.dart';
@@ -10,14 +9,19 @@ import '../services/vehicle_service.dart';
 import 'widgets/search_picker_sheet.dart';
 
 const List<String> incomeExpenseTypes = ['Expenses', 'Income'];
-const String _salaryAdvanceHead = 'SALARY ADVANCE';
-const String _fuelHead = 'FUEL';
+const String _employeeMappedMaster = 'Employee';
+const String _vehicleMappedMaster = 'Vehicle';
 
 /// Income or Expenses — mirrors the desktop app's existing Income/Expenses
 /// entry exactly (same Head master, same shared TRANSACTIONS sequence),
-/// with one mobile-specific addition: picking "SALARY ADVANCE" asks for an
-/// Employee and picking "FUEL" asks for a Vehicle, instead of leaving the
-/// rep to type that into Particulars by hand.
+/// with one mobile-specific addition: a Head whose Head Master record maps
+/// it to Employee or Vehicle (e.g. "SALARY ADVANCE" -> Employee, "FUEL" ->
+/// Vehicle) asks for that master here instead of leaving the rep to type it
+/// into Particulars by hand. Unlike other entry screens, Entry Date here
+/// defaults to today's actual device date, not the legacy desktop
+/// "business date" (dbo.CHANGE_DATE) — entries made after business hours
+/// but before a desktop day-close were otherwise getting dated into the
+/// past and silently missing the report's default date-range filter.
 class CreateIncomeExpenseScreen extends StatefulWidget {
   const CreateIncomeExpenseScreen({super.key});
 
@@ -42,16 +46,13 @@ class _CreateIncomeExpenseScreenState extends State<CreateIncomeExpenseScreen> {
   bool _loadingHeads = false;
   bool _saving = false;
 
-  bool get _isSalaryAdvance => _selectedHead?.headName.trim().toUpperCase() == _salaryAdvanceHead;
-  bool get _isFuel => _selectedHead?.headName.trim().toUpperCase() == _fuelHead;
+  bool get _isSalaryAdvance => _selectedHead?.mappedMaster == _employeeMappedMaster;
+  bool get _isFuel => _selectedHead?.mappedMaster == _vehicleMappedMaster;
 
   @override
   void initState() {
     super.initState();
-    CurrentDateProvider.instance.ensureLoaded().then((_) {
-      if (!mounted) return;
-      setState(() => _entryDate ??= CurrentDateProvider.instance.currentDate);
-    });
+    _entryDate = DateTime.now();
     _loadHeads();
   }
 
@@ -72,7 +73,7 @@ class _CreateIncomeExpenseScreenState extends State<CreateIncomeExpenseScreen> {
   }
 
   Future<void> _pickEntryDate() async {
-    final initial = _entryDate ?? CurrentDateProvider.instance.currentDate;
+    final initial = _entryDate ?? DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -110,11 +111,11 @@ class _CreateIncomeExpenseScreenState extends State<CreateIncomeExpenseScreen> {
       return;
     }
     if (_isSalaryAdvance && _selectedEmployee == null) {
-      _showMessage('Select an employee for Salary Advance.');
+      _showMessage('Select an employee for this head.');
       return;
     }
     if (_isFuel && _selectedVehicle == null) {
-      _showMessage('Select a vehicle for Fuel.');
+      _showMessage('Select a vehicle for this head.');
       return;
     }
     final amount = double.tryParse(_amountController.text.trim());
@@ -126,7 +127,7 @@ class _CreateIncomeExpenseScreenState extends State<CreateIncomeExpenseScreen> {
     setState(() => _saving = true);
     try {
       final entryNo = await _incomeExpenseService.create(
-        entryDate: _entryDate ?? CurrentDateProvider.instance.currentDate,
+        entryDate: _entryDate ?? DateTime.now(),
         incomeOrExpenses: _selectedType,
         headId: head.headId,
         particulars: _particularsController.text.trim().isEmpty ? null : _particularsController.text.trim(),
@@ -179,7 +180,7 @@ class _CreateIncomeExpenseScreenState extends State<CreateIncomeExpenseScreen> {
               onTap: _pickEntryDate,
               child: InputDecorator(
                 decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Entry Date'),
-                child: Text(_dateFormat.format(_entryDate ?? CurrentDateProvider.instance.currentDate)),
+                child: Text(_dateFormat.format(_entryDate ?? DateTime.now())),
               ),
             ),
             const SizedBox(height: 16),

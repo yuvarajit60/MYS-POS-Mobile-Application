@@ -5,6 +5,7 @@ class IncomeExpenseSummary {
   final String incomeOrExpenses;
   final String particulars;
   final double amount;
+  final double runningBalance;
 
   IncomeExpenseSummary({
     required this.entryNo,
@@ -13,6 +14,7 @@ class IncomeExpenseSummary {
     required this.incomeOrExpenses,
     required this.particulars,
     required this.amount,
+    required this.runningBalance,
   });
 
   factory IncomeExpenseSummary.fromJson(Map<String, dynamic> json) => IncomeExpenseSummary(
@@ -22,5 +24,6 @@ class IncomeExpenseSummary {
         incomeOrExpenses: json['incomeOrExpenses'] as String,
         particulars: json['particulars'] as String? ?? '',
         amount: (json['amount'] as num).toDouble(),
+        runningBalance: (json['runningBalance'] as num).toDouble(),
       );
 }
