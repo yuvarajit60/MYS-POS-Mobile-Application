@@ -232,7 +232,11 @@ class _Sidebar extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
               child: Row(
                 children: [
-                  Image.asset('assets/icon/mys_logo.png', height: 32),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                    child: Image.asset('assets/icon/mys_logo.png', height: 28),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: AnimatedBuilder(
