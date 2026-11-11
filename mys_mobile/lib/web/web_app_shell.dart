@@ -230,26 +230,12 @@ class _Sidebar extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                    child: Image.asset('assets/icon/mys_logo.png', height: 28),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: AnimatedBuilder(
-                      animation: CompanyProvider.instance,
-                      builder: (context, _) => Text(
-                        CompanyProvider.instance.company?.companyName ?? 'MYS Sales',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.2),
-                      ),
-                    ),
-                  ),
-                ],
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                  child: Image.asset('assets/icon/mys_logo.png', height: 36),
+                ),
               ),
             ),
             Expanded(
@@ -478,7 +464,18 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: MysColors.navy900)),
+          AnimatedBuilder(
+            animation: CompanyProvider.instance,
+            builder: (context, _) => Text(
+              CompanyProvider.instance.company?.companyName ?? 'MYS Sales',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MysColors.navy900),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Text('|', style: TextStyle(color: Colors.black26, fontSize: 18)),
+          ),
+          Text(title, style: const TextStyle(fontSize: 16, color: MysColors.navy900)),
           const Spacer(),
           IconButton(icon: const Icon(Icons.logout), tooltip: 'Logout', onPressed: onLogout),
         ],
