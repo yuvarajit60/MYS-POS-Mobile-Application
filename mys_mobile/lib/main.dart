@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
 import 'core/session.dart';
@@ -18,6 +19,41 @@ class MysMobileApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildMysTheme(),
       home: const _BootGate(),
+      builder: (context, child) => _PhoneFrame(child: child),
+    );
+  }
+}
+
+/// This UI was designed phone-first (fixed bottom nav, grids sized for a
+/// narrow screen). On web, a wide browser window stretches that same
+/// layout edge-to-edge, spreading everything out oddly instead of just
+/// showing more content. Rather than reflow every screen for desktop, this
+/// keeps the app at a phone-like width and centers it on wider viewports —
+/// native Android/iOS builds and narrow browser windows are unaffected.
+class _PhoneFrame extends StatelessWidget {
+  final Widget? child;
+  const _PhoneFrame({required this.child});
+
+  static const _maxWidth = 480.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = this.child;
+    if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth <= _maxWidth) return child;
+        return ColoredBox(
+          color: MysColors.navy900,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _maxWidth),
+              child: Material(elevation: 12, child: child),
+            ),
+          ),
+        );
+      },
     );
   }
 }
