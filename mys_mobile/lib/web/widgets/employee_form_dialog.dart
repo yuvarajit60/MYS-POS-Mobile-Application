@@ -187,7 +187,7 @@ class _EmployeeFormDialogState extends State<EmployeeFormDialog> {
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Close',
-                      onPressed: busy ? null : () => Navigator.of(context).pop(false),
+                      onPressed: busy ? null : () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),

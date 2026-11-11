@@ -12,6 +12,8 @@ Future<T?> showWebSearchPicker<T>({
   required Future<List<T>> Function(String query) search,
   required String Function(T item) itemLabel,
   String Function(T item)? itemSubtitle,
+  String? addNewLabel,
+  Future<T?> Function(BuildContext context)? onAddNew,
 }) {
   return showDialog<T>(
     context: context,
@@ -20,6 +22,8 @@ Future<T?> showWebSearchPicker<T>({
       search: search,
       itemLabel: itemLabel,
       itemSubtitle: itemSubtitle,
+      addNewLabel: addNewLabel,
+      onAddNew: onAddNew,
     ),
   );
 }
@@ -29,12 +33,16 @@ class _WebSearchPickerDialog<T> extends StatefulWidget {
   final Future<List<T>> Function(String query) search;
   final String Function(T item) itemLabel;
   final String Function(T item)? itemSubtitle;
+  final String? addNewLabel;
+  final Future<T?> Function(BuildContext context)? onAddNew;
 
   const _WebSearchPickerDialog({
     required this.title,
     required this.search,
     required this.itemLabel,
     this.itemSubtitle,
+    this.addNewLabel,
+    this.onAddNew,
   });
 
   @override
@@ -80,8 +88,15 @@ class _WebSearchPickerDialogState<T> extends State<_WebSearchPickerDialog<T>> {
     super.dispose();
   }
 
+  Future<void> _handleAddNew() async {
+    final created = await widget.onAddNew!(context);
+    if (created != null && mounted) Navigator.of(context).pop(created);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canAddNew = widget.addNewLabel != null && widget.onAddNew != null;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
@@ -104,9 +119,24 @@ class _WebSearchPickerDialogState<T> extends State<_WebSearchPickerDialog<T>> {
               if (_loading) const LinearProgressIndicator(),
               Flexible(
                 child: _results.isEmpty && !_loading
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: Text('No results')),
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('No results'),
+                              if (canAddNew) ...[
+                                const SizedBox(height: 16),
+                                OutlinedButton.icon(
+                                  onPressed: _handleAddNew,
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  label: Text(widget.addNewLabel!),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       )
                     : ListView.builder(
                         shrinkWrap: true,

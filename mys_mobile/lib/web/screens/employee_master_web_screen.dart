@@ -56,16 +56,16 @@ class _EmployeeMasterWebScreenState extends State<EmployeeMasterWebScreen> {
   }
 
   Future<void> _addNew() async {
-    final saved = await showDialog<bool>(context: context, builder: (_) => const EmployeeFormDialog());
-    if (saved == true) _runSearch(_searchController.text);
+    final saved = await showDialog<Object>(context: context, builder: (_) => const EmployeeFormDialog());
+    if (saved != null) _runSearch(_searchController.text);
   }
 
   Future<void> _edit(Employee employee) async {
     try {
       final detail = await _employeeService.getById(employee.employeeId);
       if (!mounted) return;
-      final saved = await showDialog<bool>(context: context, builder: (_) => EmployeeFormDialog(editing: detail));
-      if (saved == true) _runSearch(_searchController.text);
+      final saved = await showDialog<Object>(context: context, builder: (_) => EmployeeFormDialog(editing: detail));
+      if (saved != null) _runSearch(_searchController.text);
     } on EmployeeServiceException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

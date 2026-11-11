@@ -57,16 +57,16 @@ class _SiteMasterWebScreenState extends State<SiteMasterWebScreen> {
   }
 
   Future<void> _addNew() async {
-    final saved = await showDialog<bool>(context: context, builder: (_) => const SiteFormDialog());
-    if (saved == true) _runSearch(_searchController.text);
+    final saved = await showDialog<Object>(context: context, builder: (_) => const SiteFormDialog());
+    if (saved != null) _runSearch(_searchController.text);
   }
 
   Future<void> _edit(Site site) async {
     try {
       final detail = await _siteService.getById(site.siteId);
       if (!mounted) return;
-      final saved = await showDialog<bool>(context: context, builder: (_) => SiteFormDialog(editing: detail));
-      if (saved == true) _runSearch(_searchController.text);
+      final saved = await showDialog<Object>(context: context, builder: (_) => SiteFormDialog(editing: detail));
+      if (saved != null) _runSearch(_searchController.text);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

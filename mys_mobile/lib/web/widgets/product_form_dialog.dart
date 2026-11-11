@@ -193,7 +193,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Close',
-                      onPressed: busy ? null : () => Navigator.of(context).pop(false),
+                      onPressed: busy ? null : () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),

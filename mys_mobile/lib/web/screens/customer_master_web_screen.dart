@@ -57,16 +57,16 @@ class _CustomerMasterWebScreenState extends State<CustomerMasterWebScreen> {
   }
 
   Future<void> _addNew() async {
-    final saved = await showDialog<bool>(context: context, builder: (_) => const CustomerFormDialog());
-    if (saved == true) _runSearch(_searchController.text);
+    final saved = await showDialog<Object>(context: context, builder: (_) => const CustomerFormDialog());
+    if (saved != null) _runSearch(_searchController.text);
   }
 
   Future<void> _edit(Customer customer) async {
     try {
       final detail = await _customerService.getById(customer.customerId);
       if (!mounted) return;
-      final saved = await showDialog<bool>(context: context, builder: (_) => CustomerFormDialog(editing: detail));
-      if (saved == true) _runSearch(_searchController.text);
+      final saved = await showDialog<Object>(context: context, builder: (_) => CustomerFormDialog(editing: detail));
+      if (saved != null) _runSearch(_searchController.text);
     } on CustomerServiceException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

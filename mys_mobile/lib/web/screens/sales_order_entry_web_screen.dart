@@ -1,0 +1,313 @@
+import 'package:flutter/material.dart';
+import '../../core/app_theme.dart';
+import '../../models/customer.dart';
+import '../../models/product.dart';
+import '../../models/sales_order_line.dart';
+import '../../models/site.dart';
+import '../../models/site_detail.dart';
+import '../../screens/widgets/line_items_grid.dart';
+import '../../services/customer_service.dart';
+import '../../services/product_service.dart';
+import '../../services/sales_order_service.dart';
+import '../../services/site_service.dart';
+import '../widgets/customer_form_dialog.dart';
+import '../widgets/product_form_dialog.dart';
+import '../widgets/site_form_dialog.dart';
+import '../widgets/web_search_picker.dart';
+
+/// Web equivalent of create_sales_order_screen.dart (mobile) — same
+/// Customer/Site/Product picking logic and the same shared LineItemsGrid
+/// (a plain data-grid widget, not phone-specific, so reused verbatim).
+/// Inline "Add New" during picking opens the web form dialogs instead of
+/// pushing mobile screens.
+class SalesOrderEntryWebScreen extends StatefulWidget {
+  const SalesOrderEntryWebScreen({super.key});
+
+  @override
+  State<SalesOrderEntryWebScreen> createState() => _SalesOrderEntryWebScreenState();
+}
+
+class _SalesOrderEntryWebScreenState extends State<SalesOrderEntryWebScreen> {
+  final _customerService = CustomerService();
+  final _productService = ProductService();
+  final _salesOrderService = SalesOrderService();
+  final _siteService = SiteService();
+
+  Customer? _selectedCustomer;
+  Site? _selectedSite;
+  final List<SalesOrderLine> _lines = [];
+  bool _saving = false;
+
+  double get _grandTotal => _lines.fold(0, (sum, line) => sum + line.totalAmount);
+
+  // Matches the backend's rounding: the saved order's NETAMOUNT is rounded
+  // to the nearest whole rupee, with the difference stored as ROUNDOFF.
+  double get _roundedGrandTotal => _grandTotal.roundToDouble();
+
+  Future<void> _pickCustomer() async {
+    final customer = await showWebSearchPicker<Customer>(
+      context: context,
+      title: 'Search customer name or mobile number',
+      search: _customerService.search,
+      itemLabel: (c) => c.customerName,
+      itemSubtitle: (c) => c.mobileNo,
+      addNewLabel: 'Add New Customer',
+      onAddNew: (context) => showDialog<Customer>(context: context, builder: (_) => const CustomerFormDialog()),
+    );
+    if (customer == null) return;
+    setState(() {
+      _selectedCustomer = customer;
+      _selectedSite = null;
+    });
+  }
+
+  /// Sites already mapped to the selected customer come first, followed by
+  /// every other existing site (deduplicated) — a site not yet linked to
+  /// this customer is still pickable, since sites get reused across jobs
+  /// for different customers rather than belonging to one forever.
+  Future<List<Site>> _searchSitesForCustomer(String query) async {
+    final results = await Future.wait([
+      _siteService.search(query, customerId: _selectedCustomer!.customerId),
+      _siteService.search(query),
+    ]);
+    final mapped = results[0];
+    final all = results[1];
+    final mappedIds = mapped.map((s) => s.siteId).toSet();
+    return [...mapped, ...all.where((s) => !mappedIds.contains(s.siteId))];
+  }
+
+  Site _siteFromDetail(SiteDetail detail) => Site(
+        siteId: detail.siteId,
+        siteName: detail.siteName,
+        areaName: detail.areaName,
+        customerId: detail.customerId,
+        customerName: detail.customerName,
+        mobileNo: _selectedCustomer?.mobileNo ?? '',
+      );
+
+  Future<void> _pickSite() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+
+    final site = await showWebSearchPicker<Site>(
+      context: context,
+      title: 'Search site',
+      search: _searchSitesForCustomer,
+      itemLabel: (s) => s.siteName,
+      itemSubtitle: (s) =>
+          s.customerId == _selectedCustomer!.customerId ? s.areaName : '${s.customerName ?? 'Not mapped'} • ${s.areaName}',
+      addNewLabel: 'Add New Site',
+      onAddNew: (context) async {
+        final detail = await showDialog<SiteDetail>(context: context, builder: (_) => const SiteFormDialog());
+        if (detail == null) return null;
+        // Site master creates bare (unmapped) sites; map it to the
+        // customer already selected here so it's immediately usable.
+        final mapped = await _siteService.assignCustomer(
+          siteId: detail.siteId,
+          customerId: _selectedCustomer!.customerId,
+        );
+        return _siteFromDetail(mapped);
+      },
+    );
+    if (site == null) return;
+
+    if (site.customerId == _selectedCustomer!.customerId) {
+      setState(() => _selectedSite = site);
+      return;
+    }
+
+    // New Customer + Site combination (the site was unmapped, or mapped to
+    // a different customer) — record it in SITE_MAPPING before using it.
+    try {
+      final mapped = await _siteService.assignCustomer(
+        siteId: site.siteId,
+        customerId: _selectedCustomer!.customerId,
+      );
+      setState(() => _selectedSite = _siteFromDetail(mapped));
+    } on SiteServiceException catch (e) {
+      _showMessage(e.message);
+    }
+  }
+
+  Future<void> _addProduct() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+
+    final product = await showWebSearchPicker<Product>(
+      context: context,
+      title: 'Search product',
+      search: _productService.search,
+      itemLabel: (p) => p.productName,
+      itemSubtitle: (p) => 'MRP: ${p.rate.toStringAsFixed(2)}',
+      addNewLabel: 'Add New Product',
+      onAddNew: (context) => showDialog<Product>(context: context, builder: (_) => const ProductFormDialog()),
+    );
+    if (product == null) return;
+
+    setState(() {
+      final existingIndex = _lines.indexWhere((l) => l.product.productId == product.productId);
+      if (existingIndex >= 0) {
+        _lines[existingIndex].qty += 1;
+      } else {
+        _lines.add(SalesOrderLine(product: product));
+      }
+    });
+  }
+
+  void _onQtyChanged(int index, double newQty) {
+    setState(() => _lines[index].qty = newQty);
+  }
+
+  void _onMrpChanged(int index, double newMrp) {
+    setState(() => _lines[index].updateFromMrp(newMrp));
+  }
+
+  void _onRateChanged(int index, double newRate) {
+    setState(() => _lines[index].updateFromRate(newRate));
+  }
+
+  void _onDiscountToggled(int index, bool enabled) {
+    setState(() => _lines[index].setDiscountEnabled(enabled));
+  }
+
+  void _onDiscountChanged(int index, double newDiscount) {
+    setState(() => _lines[index].updateFromDiscount(newDiscount));
+  }
+
+  void _onDeleteLine(int index) {
+    setState(() => _lines.removeAt(index));
+  }
+
+  Future<void> _saveAndClose() async {
+    if (_selectedCustomer == null) {
+      _showMessage('Select a customer first.');
+      return;
+    }
+    if (_lines.isEmpty) {
+      _showMessage('Add at least one product.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final site = _selectedSite;
+      final result = await _salesOrderService.create(
+        customer: _selectedCustomer!,
+        shippingAddress: site == null ? '' : '${site.siteName}, ${site.areaName}',
+        siteId: site?.siteId,
+        lines: _lines,
+      );
+      if (!mounted) return;
+      _showMessage('Sales order ${result.entryNo} saved.');
+      setState(() {
+        _selectedCustomer = null;
+        _selectedSite = null;
+        _lines.clear();
+      });
+    } on SalesOrderException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: MysColors.bgLight,
+      padding: const EdgeInsets.all(24),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 820),
+          child: SingleChildScrollView(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Customer', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _pickCustomer,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Customer'),
+                        child: Text(
+                          _selectedCustomer == null
+                              ? 'Click to select a customer'
+                              : '${_selectedCustomer!.customerName}  (${_selectedCustomer!.mobileNo})',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: _pickSite,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Site Delivery'),
+                        child: Text(
+                          _selectedSite == null
+                              ? 'Click to select a site'
+                              : '${_selectedSite!.siteName}  (${_selectedSite!.areaName})',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Products', style: Theme.of(context).textTheme.titleMedium),
+                        TextButton.icon(
+                          onPressed: _selectedCustomer == null ? null : _addProduct,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add product'),
+                        ),
+                      ],
+                    ),
+                    LineItemsGrid(
+                      lines: _lines,
+                      onQtyChanged: _onQtyChanged,
+                      onMrpChanged: _onMrpChanged,
+                      onRateChanged: _onRateChanged,
+                      onDiscountToggled: _onDiscountToggled,
+                      onDiscountChanged: _onDiscountChanged,
+                      onDelete: _onDeleteLine,
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(_roundedGrandTotal.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _saving ? null : _saveAndClose,
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Save and Close'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

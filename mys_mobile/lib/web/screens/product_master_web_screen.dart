@@ -56,16 +56,16 @@ class _ProductMasterWebScreenState extends State<ProductMasterWebScreen> {
   }
 
   Future<void> _addNew() async {
-    final saved = await showDialog<bool>(context: context, builder: (_) => const ProductFormDialog());
-    if (saved == true) _runSearch(_searchController.text);
+    final saved = await showDialog<Object>(context: context, builder: (_) => const ProductFormDialog());
+    if (saved != null) _runSearch(_searchController.text);
   }
 
   Future<void> _edit(Product product) async {
     try {
       final detail = await _productService.getById(product.productId);
       if (!mounted) return;
-      final saved = await showDialog<bool>(context: context, builder: (_) => ProductFormDialog(editing: detail));
-      if (saved == true) _runSearch(_searchController.text);
+      final saved = await showDialog<Object>(context: context, builder: (_) => ProductFormDialog(editing: detail));
+      if (saved != null) _runSearch(_searchController.text);
     } on ProductServiceException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

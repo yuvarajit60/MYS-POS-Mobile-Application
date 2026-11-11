@@ -58,13 +58,11 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
     try {
       final siteName = _nameController.text.trim();
 
-      if (_isEditing) {
-        await _siteService.update(siteId: widget.editing!.siteId, siteName: siteName, area: _selectedArea!);
-      } else {
-        await _siteService.create(siteName: siteName, area: _selectedArea!);
-      }
+      final site = _isEditing
+          ? await _siteService.update(siteId: widget.editing!.siteId, siteName: siteName, area: _selectedArea!)
+          : await _siteService.create(siteName: siteName, area: _selectedArea!);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop<SiteDetail>(site);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -141,7 +139,7 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Close',
-                      onPressed: busy ? null : () => Navigator.of(context).pop(false),
+                      onPressed: busy ? null : () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),

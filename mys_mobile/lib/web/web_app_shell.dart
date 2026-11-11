@@ -5,12 +5,26 @@ import '../core/session.dart';
 import '../core/web_layout_mode.dart';
 import '../screens/login_screen.dart';
 import 'screens/area_master_web_screen.dart';
+import 'screens/cancel_entry_web_screen.dart';
 import 'screens/customer_master_web_screen.dart';
 import 'screens/customer_site_mapping_web_screen.dart';
+import 'screens/delivery_entry_web_screen.dart';
+import 'screens/delivery_report_web_screen.dart';
 import 'screens/employee_master_web_screen.dart';
 import 'screens/head_master_web_screen.dart';
+import 'screens/income_expense_entry_web_screen.dart';
+import 'screens/income_expense_report_web_screen.dart';
+import 'screens/ledger_report_web_screen.dart';
+import 'screens/payment_entry_web_screen.dart';
+import 'screens/payment_report_web_screen.dart';
 import 'screens/product_master_web_screen.dart';
+import 'screens/sales_entry_web_screen.dart';
+import 'screens/sales_order_entry_web_screen.dart';
+import 'screens/sales_order_report_web_screen.dart';
+import 'screens/sales_report_web_screen.dart';
 import 'screens/site_master_web_screen.dart';
+import 'screens/trip_entry_report_web_screen.dart';
+import 'screens/trip_entry_web_screen.dart';
 import 'screens/vehicle_mapping_web_screen.dart';
 
 /// The web app's own shell — sidebar + top bar — deliberately not a reuse
@@ -40,10 +54,24 @@ enum _WebSection {
   vehicleMapping,
   employee,
   headMaster,
+  salesOrder,
+  delivery,
+  tripEntry,
+  payment,
+  salesEntry,
+  incomeExpense,
+  cancelEntry,
+  salesOrderReport,
+  salesReport,
+  tripEntryReport,
+  deliveryReport,
+  customerLedger,
+  paymentReport,
+  incomeExpenseReport,
 }
 
 class _WebAppShellState extends State<WebAppShell> {
-  _WebSection _selected = _WebSection.product;
+  _WebSection _selected = _WebSection.salesOrder;
 
   @override
   void initState() {
@@ -85,6 +113,34 @@ class _WebAppShellState extends State<WebAppShell> {
         return 'Employee';
       case _WebSection.headMaster:
         return 'Head Master';
+      case _WebSection.salesOrder:
+        return 'Sales Order';
+      case _WebSection.delivery:
+        return 'Delivery Entry';
+      case _WebSection.tripEntry:
+        return 'Trip Entry';
+      case _WebSection.payment:
+        return 'Payment Entry';
+      case _WebSection.salesEntry:
+        return 'Sales Entry';
+      case _WebSection.incomeExpense:
+        return 'Income or Expenses';
+      case _WebSection.cancelEntry:
+        return 'Cancel Entry';
+      case _WebSection.salesOrderReport:
+        return 'Sales Order Report';
+      case _WebSection.salesReport:
+        return 'Sales Report';
+      case _WebSection.tripEntryReport:
+        return 'Trip Entry Report';
+      case _WebSection.deliveryReport:
+        return 'Delivery Report';
+      case _WebSection.customerLedger:
+        return 'Customer Ledger';
+      case _WebSection.paymentReport:
+        return 'Payment Report';
+      case _WebSection.incomeExpenseReport:
+        return 'Income and Expenses Report';
     }
   }
 
@@ -106,6 +162,34 @@ class _WebAppShellState extends State<WebAppShell> {
         return const EmployeeMasterWebScreen();
       case _WebSection.headMaster:
         return const HeadMasterWebScreen();
+      case _WebSection.salesOrder:
+        return const SalesOrderEntryWebScreen();
+      case _WebSection.delivery:
+        return const DeliveryEntryWebScreen();
+      case _WebSection.tripEntry:
+        return const TripEntryWebScreen();
+      case _WebSection.payment:
+        return const PaymentEntryWebScreen();
+      case _WebSection.salesEntry:
+        return const SalesEntryWebScreen();
+      case _WebSection.incomeExpense:
+        return const IncomeExpenseEntryWebScreen();
+      case _WebSection.cancelEntry:
+        return const CancelEntryWebScreen();
+      case _WebSection.salesOrderReport:
+        return const SalesOrderReportWebScreen();
+      case _WebSection.salesReport:
+        return const SalesReportWebScreen();
+      case _WebSection.tripEntryReport:
+        return const TripEntryReportWebScreen();
+      case _WebSection.deliveryReport:
+        return const DeliveryReportWebScreen();
+      case _WebSection.customerLedger:
+        return const LedgerReportWebScreen();
+      case _WebSection.paymentReport:
+        return const PaymentReportWebScreen();
+      case _WebSection.incomeExpenseReport:
+        return const IncomeExpenseReportWebScreen();
     }
   }
 
@@ -170,6 +254,104 @@ class _Sidebar extends StatelessWidget {
                 children: [
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text(
+                      'ENTRIES',
+                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+                    ),
+                  ),
+                  _NavItem(
+                    icon: Icons.description_outlined,
+                    label: 'Sales Order',
+                    selected: selected == _WebSection.salesOrder,
+                    onTap: () => onSelect(_WebSection.salesOrder),
+                  ),
+                  _NavItem(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Trip Entry',
+                    selected: selected == _WebSection.tripEntry,
+                    onTap: () => onSelect(_WebSection.tripEntry),
+                  ),
+                  _NavItem(
+                    icon: Icons.local_shipping,
+                    label: 'Delivery Entry',
+                    selected: selected == _WebSection.delivery,
+                    onTap: () => onSelect(_WebSection.delivery),
+                  ),
+                  _NavItem(
+                    icon: Icons.payments_outlined,
+                    label: 'Payment Entry',
+                    selected: selected == _WebSection.payment,
+                    onTap: () => onSelect(_WebSection.payment),
+                  ),
+                  _NavItem(
+                    icon: Icons.cancel_outlined,
+                    label: 'Cancel Entry',
+                    selected: selected == _WebSection.cancelEntry,
+                    onTap: () => onSelect(_WebSection.cancelEntry),
+                  ),
+                  _NavItem(
+                    icon: Icons.fact_check_outlined,
+                    label: 'Sales Entry',
+                    selected: selected == _WebSection.salesEntry,
+                    onTap: () => onSelect(_WebSection.salesEntry),
+                  ),
+                  _NavItem(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Income or Expenses',
+                    selected: selected == _WebSection.incomeExpense,
+                    onTap: () => onSelect(_WebSection.incomeExpense),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Text(
+                      'REPORTS',
+                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+                    ),
+                  ),
+                  _NavItem(
+                    icon: Icons.description_outlined,
+                    label: 'Sales Order Report',
+                    selected: selected == _WebSection.salesOrderReport,
+                    onTap: () => onSelect(_WebSection.salesOrderReport),
+                  ),
+                  _NavItem(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Sales Report',
+                    selected: selected == _WebSection.salesReport,
+                    onTap: () => onSelect(_WebSection.salesReport),
+                  ),
+                  _NavItem(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Trip Entry Report',
+                    selected: selected == _WebSection.tripEntryReport,
+                    onTap: () => onSelect(_WebSection.tripEntryReport),
+                  ),
+                  _NavItem(
+                    icon: Icons.local_shipping,
+                    label: 'Delivery Report',
+                    selected: selected == _WebSection.deliveryReport,
+                    onTap: () => onSelect(_WebSection.deliveryReport),
+                  ),
+                  _NavItem(
+                    icon: Icons.account_balance_outlined,
+                    label: 'Customer Ledger',
+                    selected: selected == _WebSection.customerLedger,
+                    onTap: () => onSelect(_WebSection.customerLedger),
+                  ),
+                  _NavItem(
+                    icon: Icons.payments_outlined,
+                    label: 'Payment Report',
+                    selected: selected == _WebSection.paymentReport,
+                    onTap: () => onSelect(_WebSection.paymentReport),
+                  ),
+                  _NavItem(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Income and Expenses Report',
+                    selected: selected == _WebSection.incomeExpenseReport,
+                    onTap: () => onSelect(_WebSection.incomeExpenseReport),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Text(
                       'MASTERS',
                       style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
