@@ -4,17 +4,26 @@ import '../core/company_provider.dart';
 import '../core/session.dart';
 import '../core/web_layout_mode.dart';
 import '../screens/login_screen.dart';
+import 'screens/area_master_web_screen.dart';
+import 'screens/customer_master_web_screen.dart';
+import 'screens/customer_site_mapping_web_screen.dart';
+import 'screens/employee_master_web_screen.dart';
 import 'screens/head_master_web_screen.dart';
+import 'screens/product_master_web_screen.dart';
+import 'screens/site_master_web_screen.dart';
+import 'screens/vehicle_mapping_web_screen.dart';
 
 /// The web app's own shell — sidebar + top bar — deliberately not a reuse
 /// of MainShellScreen's phone-style bottom nav (see main.dart's
-/// _PhoneFrame comment). This is the pilot for the web's visual language:
-/// a conventional admin-dashboard layout (sidebar nav grouped by section,
-/// a content area, a top bar for page title + logout) inspired by the
-/// desktop app's Masters/Transactions/Reports grouping but styled as a
-/// modern web app, not a copy of either the desktop or mobile screens.
-/// Only Head Master is wired up for now — more sections get added here as
-/// each one gets its own web screen built.
+/// _PhoneFrame comment). A conventional admin-dashboard layout (sidebar
+/// nav grouped by section, a content area, a top bar for page title +
+/// logout) inspired by the desktop app's Masters/Transactions/Reports
+/// grouping but styled as a modern web app, not a copy of either the
+/// desktop or mobile screens. Every master screen here is still backed by
+/// the exact same service/model as its mobile counterpart — only the
+/// presentation (data table + modal dialog instead of list + pushed
+/// screen) differs. Entries and Reports sections get added the same way
+/// once their own web screens are built.
 class WebAppShell extends StatefulWidget {
   const WebAppShell({super.key});
 
@@ -22,10 +31,19 @@ class WebAppShell extends StatefulWidget {
   State<WebAppShell> createState() => _WebAppShellState();
 }
 
-enum _WebSection { headMaster }
+enum _WebSection {
+  product,
+  customer,
+  site,
+  customerSiteMapping,
+  area,
+  vehicleMapping,
+  employee,
+  headMaster,
+}
 
 class _WebAppShellState extends State<WebAppShell> {
-  _WebSection _selected = _WebSection.headMaster;
+  _WebSection _selected = _WebSection.product;
 
   @override
   void initState() {
@@ -51,6 +69,20 @@ class _WebAppShellState extends State<WebAppShell> {
 
   String get _title {
     switch (_selected) {
+      case _WebSection.product:
+        return 'Product';
+      case _WebSection.customer:
+        return 'Customer';
+      case _WebSection.site:
+        return 'Site';
+      case _WebSection.customerSiteMapping:
+        return 'Customer Site Mapping';
+      case _WebSection.area:
+        return 'Area';
+      case _WebSection.vehicleMapping:
+        return 'Vehicle Mapping';
+      case _WebSection.employee:
+        return 'Employee';
       case _WebSection.headMaster:
         return 'Head Master';
     }
@@ -58,6 +90,20 @@ class _WebAppShellState extends State<WebAppShell> {
 
   Widget get _content {
     switch (_selected) {
+      case _WebSection.product:
+        return const ProductMasterWebScreen();
+      case _WebSection.customer:
+        return const CustomerMasterWebScreen();
+      case _WebSection.site:
+        return const SiteMasterWebScreen();
+      case _WebSection.customerSiteMapping:
+        return const CustomerSiteMappingWebScreen();
+      case _WebSection.area:
+        return const AreaMasterWebScreen();
+      case _WebSection.vehicleMapping:
+        return const VehicleMappingWebScreen();
+      case _WebSection.employee:
+        return const EmployeeMasterWebScreen();
       case _WebSection.headMaster:
         return const HeadMasterWebScreen();
     }
@@ -92,7 +138,7 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
+      width: 260,
       color: MysColors.navy900,
       child: SafeArea(
         child: Column(
@@ -118,18 +164,67 @@ class _Sidebar extends StatelessWidget {
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                'MASTERS',
-                style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text(
+                      'MASTERS',
+                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+                    ),
+                  ),
+                  _NavItem(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Product',
+                    selected: selected == _WebSection.product,
+                    onTap: () => onSelect(_WebSection.product),
+                  ),
+                  _NavItem(
+                    icon: Icons.people_alt_outlined,
+                    label: 'Customer',
+                    selected: selected == _WebSection.customer,
+                    onTap: () => onSelect(_WebSection.customer),
+                  ),
+                  _NavItem(
+                    icon: Icons.location_on_outlined,
+                    label: 'Site',
+                    selected: selected == _WebSection.site,
+                    onTap: () => onSelect(_WebSection.site),
+                  ),
+                  _NavItem(
+                    icon: Icons.link_outlined,
+                    label: 'Customer Site Mapping',
+                    selected: selected == _WebSection.customerSiteMapping,
+                    onTap: () => onSelect(_WebSection.customerSiteMapping),
+                  ),
+                  _NavItem(
+                    icon: Icons.map_outlined,
+                    label: 'Area',
+                    selected: selected == _WebSection.area,
+                    onTap: () => onSelect(_WebSection.area),
+                  ),
+                  _NavItem(
+                    icon: Icons.directions_car_outlined,
+                    label: 'Vehicle Mapping',
+                    selected: selected == _WebSection.vehicleMapping,
+                    onTap: () => onSelect(_WebSection.vehicleMapping),
+                  ),
+                  _NavItem(
+                    icon: Icons.badge_outlined,
+                    label: 'Employee',
+                    selected: selected == _WebSection.employee,
+                    onTap: () => onSelect(_WebSection.employee),
+                  ),
+                  _NavItem(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Head Master',
+                    selected: selected == _WebSection.headMaster,
+                    onTap: () => onSelect(_WebSection.headMaster),
+                  ),
+                ],
               ),
-            ),
-            _NavItem(
-              icon: Icons.account_balance_wallet_outlined,
-              label: 'Head Master',
-              selected: selected == _WebSection.headMaster,
-              onTap: () => onSelect(_WebSection.headMaster),
             ),
           ],
         ),
@@ -162,12 +257,14 @@ class _NavItem extends StatelessWidget {
               children: [
                 Icon(icon, color: selected ? MysColors.green400 : Colors.white70, size: 20),
                 const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? Colors.white : Colors.white70,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.white70,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
