@@ -12,6 +12,7 @@ import 'screens/delivery_entry_web_screen.dart';
 import 'screens/delivery_report_web_screen.dart';
 import 'screens/employee_master_web_screen.dart';
 import 'screens/head_master_web_screen.dart';
+import 'screens/home_web_screen.dart';
 import 'screens/income_expense_entry_web_screen.dart';
 import 'screens/income_expense_report_web_screen.dart';
 import 'screens/ledger_report_web_screen.dart';
@@ -36,8 +37,7 @@ import 'screens/vehicle_mapping_web_screen.dart';
 /// desktop or mobile screens. Every master screen here is still backed by
 /// the exact same service/model as its mobile counterpart — only the
 /// presentation (data table + modal dialog instead of list + pushed
-/// screen) differs. Entries and Reports sections get added the same way
-/// once their own web screens are built.
+/// screen) differs.
 class WebAppShell extends StatefulWidget {
   const WebAppShell({super.key});
 
@@ -46,6 +46,7 @@ class WebAppShell extends StatefulWidget {
 }
 
 enum _WebSection {
+  home,
   product,
   customer,
   site,
@@ -71,7 +72,7 @@ enum _WebSection {
 }
 
 class _WebAppShellState extends State<WebAppShell> {
-  _WebSection _selected = _WebSection.salesOrder;
+  _WebSection _selected = _WebSection.home;
 
   @override
   void initState() {
@@ -97,6 +98,8 @@ class _WebAppShellState extends State<WebAppShell> {
 
   String get _title {
     switch (_selected) {
+      case _WebSection.home:
+        return 'Home';
       case _WebSection.product:
         return 'Product';
       case _WebSection.customer:
@@ -146,6 +149,12 @@ class _WebAppShellState extends State<WebAppShell> {
 
   Widget get _content {
     switch (_selected) {
+      case _WebSection.home:
+        return HomeWebScreen(
+          onOpenMasters: () => setState(() => _selected = _WebSection.product),
+          onOpenEntries: () => setState(() => _selected = _WebSection.salesOrder),
+          onOpenReports: () => setState(() => _selected = _WebSection.salesOrderReport),
+        );
       case _WebSection.product:
         return const ProductMasterWebScreen();
       case _WebSection.customer:
@@ -242,8 +251,15 @@ class _Sidebar extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  _NavItem(
+                    icon: Icons.home_outlined,
+                    label: 'Home',
+                    color: const Color(0xFFFDCB6E),
+                    selected: selected == _WebSection.home,
+                    onTap: () => onSelect(_WebSection.home),
+                  ),
                   const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
                     child: Text(
                       'ENTRIES',
                       style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
@@ -252,42 +268,49 @@ class _Sidebar extends StatelessWidget {
                   _NavItem(
                     icon: Icons.description_outlined,
                     label: 'Sales Order',
+                    color: const Color(0xFF00B894),
                     selected: selected == _WebSection.salesOrder,
                     onTap: () => onSelect(_WebSection.salesOrder),
                   ),
                   _NavItem(
                     icon: Icons.local_shipping_outlined,
                     label: 'Trip Entry',
+                    color: const Color(0xFF00CEC9),
                     selected: selected == _WebSection.tripEntry,
                     onTap: () => onSelect(_WebSection.tripEntry),
                   ),
                   _NavItem(
                     icon: Icons.local_shipping,
                     label: 'Delivery Entry',
+                    color: const Color(0xFF55EFC4),
                     selected: selected == _WebSection.delivery,
                     onTap: () => onSelect(_WebSection.delivery),
                   ),
                   _NavItem(
                     icon: Icons.payments_outlined,
                     label: 'Payment Entry',
+                    color: const Color(0xFF2ECC71),
                     selected: selected == _WebSection.payment,
                     onTap: () => onSelect(_WebSection.payment),
                   ),
                   _NavItem(
                     icon: Icons.cancel_outlined,
                     label: 'Cancel Entry',
+                    color: const Color(0xFFE17055),
                     selected: selected == _WebSection.cancelEntry,
                     onTap: () => onSelect(_WebSection.cancelEntry),
                   ),
                   _NavItem(
                     icon: Icons.fact_check_outlined,
                     label: 'Sales Entry',
+                    color: const Color(0xFF00B894),
                     selected: selected == _WebSection.salesEntry,
                     onTap: () => onSelect(_WebSection.salesEntry),
                   ),
                   _NavItem(
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Income or Expenses',
+                    color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.incomeExpense,
                     onTap: () => onSelect(_WebSection.incomeExpense),
                   ),
@@ -301,42 +324,49 @@ class _Sidebar extends StatelessWidget {
                   _NavItem(
                     icon: Icons.description_outlined,
                     label: 'Sales Order Report',
+                    color: const Color(0xFF0984E3),
                     selected: selected == _WebSection.salesOrderReport,
                     onTap: () => onSelect(_WebSection.salesOrderReport),
                   ),
                   _NavItem(
                     icon: Icons.receipt_long_outlined,
                     label: 'Sales Report',
+                    color: const Color(0xFF74B9FF),
                     selected: selected == _WebSection.salesReport,
                     onTap: () => onSelect(_WebSection.salesReport),
                   ),
                   _NavItem(
                     icon: Icons.local_shipping_outlined,
                     label: 'Trip Entry Report',
+                    color: const Color(0xFF00CEC9),
                     selected: selected == _WebSection.tripEntryReport,
                     onTap: () => onSelect(_WebSection.tripEntryReport),
                   ),
                   _NavItem(
                     icon: Icons.local_shipping,
                     label: 'Delivery Report',
+                    color: const Color(0xFF55EFC4),
                     selected: selected == _WebSection.deliveryReport,
                     onTap: () => onSelect(_WebSection.deliveryReport),
                   ),
                   _NavItem(
                     icon: Icons.account_balance_outlined,
                     label: 'Customer Ledger',
+                    color: const Color(0xFF6C5CE7),
                     selected: selected == _WebSection.customerLedger,
                     onTap: () => onSelect(_WebSection.customerLedger),
                   ),
                   _NavItem(
                     icon: Icons.payments_outlined,
                     label: 'Payment Report',
+                    color: const Color(0xFF2ECC71),
                     selected: selected == _WebSection.paymentReport,
                     onTap: () => onSelect(_WebSection.paymentReport),
                   ),
                   _NavItem(
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Income and Expenses Report',
+                    color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.incomeExpenseReport,
                     onTap: () => onSelect(_WebSection.incomeExpenseReport),
                   ),
@@ -350,48 +380,56 @@ class _Sidebar extends StatelessWidget {
                   _NavItem(
                     icon: Icons.inventory_2_outlined,
                     label: 'Product',
+                    color: const Color(0xFF6C5CE7),
                     selected: selected == _WebSection.product,
                     onTap: () => onSelect(_WebSection.product),
                   ),
                   _NavItem(
                     icon: Icons.people_alt_outlined,
                     label: 'Customer',
+                    color: const Color(0xFFA29BFE),
                     selected: selected == _WebSection.customer,
                     onTap: () => onSelect(_WebSection.customer),
                   ),
                   _NavItem(
                     icon: Icons.location_on_outlined,
                     label: 'Site',
+                    color: const Color(0xFFFF7675),
                     selected: selected == _WebSection.site,
                     onTap: () => onSelect(_WebSection.site),
                   ),
                   _NavItem(
                     icon: Icons.link_outlined,
                     label: 'Customer Site Mapping',
+                    color: const Color(0xFFFD79A8),
                     selected: selected == _WebSection.customerSiteMapping,
                     onTap: () => onSelect(_WebSection.customerSiteMapping),
                   ),
                   _NavItem(
                     icon: Icons.map_outlined,
                     label: 'Area',
+                    color: const Color(0xFF00B894),
                     selected: selected == _WebSection.area,
                     onTap: () => onSelect(_WebSection.area),
                   ),
                   _NavItem(
                     icon: Icons.directions_car_outlined,
                     label: 'Vehicle Mapping',
+                    color: const Color(0xFFE17055),
                     selected: selected == _WebSection.vehicleMapping,
                     onTap: () => onSelect(_WebSection.vehicleMapping),
                   ),
                   _NavItem(
                     icon: Icons.badge_outlined,
                     label: 'Employee',
+                    color: const Color(0xFF0984E3),
                     selected: selected == _WebSection.employee,
                     onTap: () => onSelect(_WebSection.employee),
                   ),
                   _NavItem(
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Head Master',
+                    color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.headMaster,
                     onTap: () => onSelect(_WebSection.headMaster),
                   ),
@@ -408,17 +446,24 @@ class _Sidebar extends StatelessWidget {
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color color;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavItem({required this.icon, required this.label, required this.selected, required this.onTap});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
-        color: selected ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
+        color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -427,7 +472,7 @@ class _NavItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
-                Icon(icon, color: selected ? MysColors.green400 : Colors.white70, size: 20),
+                Icon(icon, color: color, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -455,31 +500,41 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.black12)),
-      ),
-      child: Row(
-        children: [
-          AnimatedBuilder(
-            animation: CompanyProvider.instance,
-            builder: (context, _) => Text(
-              CompanyProvider.instance.company?.companyName ?? 'MYS Sales',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MysColors.navy900),
-            ),
+    return Column(
+      children: [
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Text('|', style: TextStyle(color: Colors.black26, fontSize: 18)),
+          child: Row(
+            children: [
+              AnimatedBuilder(
+                animation: CompanyProvider.instance,
+                builder: (context, _) => Text(
+                  CompanyProvider.instance.company?.companyName ?? 'MYS Sales',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MysColors.navy900),
+                ),
+              ),
+              const Spacer(),
+              IconButton(icon: const Icon(Icons.logout), tooltip: 'Logout', onPressed: onLogout),
+            ],
           ),
-          Text(title, style: const TextStyle(fontSize: 16, color: MysColors.navy900)),
-          const Spacer(),
-          IconButton(icon: const Icon(Icons.logout), tooltip: 'Logout', onPressed: onLogout),
-        ],
-      ),
+        ),
+        Container(
+          height: 44,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          alignment: Alignment.centerLeft,
+          decoration: const BoxDecoration(
+            color: MysColors.bgLight,
+            border: Border(bottom: BorderSide(color: Colors.black12)),
+          ),
+          child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
+        ),
+      ],
     );
   }
 }
