@@ -1,6 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'session.dart';
 
 class ApiClient {
@@ -14,7 +14,11 @@ class ApiClient {
   static const String _publicApiUrl = 'https://mys-pos-mobile-application.onrender.com';
 
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:5263';
+    // flutter run -d chrome (debug) still targets a local API for
+    // development, but the deployed release build (flutter build web) must
+    // hit the real hosted API — there is no "localhost" for a browser
+    // loading the app from Render.
+    if (kIsWeb) return kReleaseMode ? _publicApiUrl : 'http://localhost:5263';
     if (Platform.isAndroid || Platform.isIOS) return _publicApiUrl;
     return 'http://localhost:5263';
   }
