@@ -40,4 +40,8 @@ public class ReportsController : ControllerBase
     [HttpGet("entry-numbers")]
     public async Task<ActionResult<IReadOnlyList<EntryNumberDto>>> EntryNumbers([FromQuery] string? search)
         => Ok(await _reportService.SearchEntryNumbersAsync(User.GetLocationId(), search));
+
+    [HttpGet("pending-by-customer")]
+    public async Task<ActionResult<IReadOnlyList<PendingSalesOrderByCustomerDto>>> PendingByCustomer()
+        => Ok(await _reportService.GetPendingByCustomerAsync(User.GetLocationId()));
 }

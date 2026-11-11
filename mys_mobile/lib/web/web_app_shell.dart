@@ -150,11 +150,7 @@ class _WebAppShellState extends State<WebAppShell> {
   Widget get _content {
     switch (_selected) {
       case _WebSection.home:
-        return HomeWebScreen(
-          onOpenMasters: () => setState(() => _selected = _WebSection.product),
-          onOpenEntries: () => setState(() => _selected = _WebSection.salesOrder),
-          onOpenReports: () => setState(() => _selected = _WebSection.salesOrderReport),
-        );
+        return const HomeWebScreen();
       case _WebSection.product:
         return const ProductMasterWebScreen();
       case _WebSection.customer:

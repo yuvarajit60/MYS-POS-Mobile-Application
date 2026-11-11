@@ -33,3 +33,5 @@ public record OrderDetailDto(
 public record GraphDataPointDto(string Label, decimal TotalAmount);
 
 public record EntryNumberDto(int SalesOrderId, string EntryNo);
+
+public record PendingSalesOrderByCustomerDto(string CustomerName, decimal PendingQty);

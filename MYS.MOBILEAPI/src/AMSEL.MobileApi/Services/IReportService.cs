@@ -10,6 +10,7 @@ public interface IReportService
     Task<OrderDetailDto?> GetOrderDetailAsync(int locationId, int salesOrderId);
     Task<IReadOnlyList<GraphDataPointDto>> GetGraphDataAsync(int locationId, string groupBy, int? year);
     Task<IReadOnlyList<EntryNumberDto>> SearchEntryNumbersAsync(int locationId, string? search);
+    Task<IReadOnlyList<PendingSalesOrderByCustomerDto>> GetPendingByCustomerAsync(int locationId);
 }
 
 /// <summary>
@@ -150,6 +151,30 @@ public class ReportService : IReportService
             ORDER BY ENTRYDATE DESC, SALESORDERID DESC
             """,
             new { LocationId = locationId, Search = search, Like = like });
+
+        return rows.ToList();
+    }
+
+    /// <summary>
+    /// Sales Order lines not yet fully delivered (SALESQTY - DELIVERYQTY > 0,
+    /// same "pending" definition as DeliveryService), summed per customer —
+    /// top 10 by pending qty, for the web dashboard's bar chart.
+    /// </summary>
+    public async Task<IReadOnlyList<PendingSalesOrderByCustomerDto>> GetPendingByCustomerAsync(int locationId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<PendingSalesOrderByCustomerDto>(
+            """
+            SELECT TOP 10 C.CUSTOMERNAME AS CustomerName, SUM(SOD.SALESQTY - SOD.DELIVERYQTY) AS PendingQty
+            FROM SALESORDER_DETAILS SOD
+            INNER JOIN SALESORDER SO ON SO.SALESORDERID = SOD.SALESORDERID
+            INNER JOIN CUSTOMER C ON C.CUSTOMERID = SO.CUSTOMERID
+            WHERE SO.LOCATIONID = @LocationId AND SO.CANCEL = 0
+              AND (SOD.SALESQTY - SOD.DELIVERYQTY) > 0
+            GROUP BY C.CUSTOMERNAME
+            ORDER BY SUM(SOD.SALESQTY - SOD.DELIVERYQTY) DESC
+            """,
+            new { LocationId = locationId });
 
         return rows.ToList();
     }

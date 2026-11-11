@@ -4,6 +4,7 @@ import '../core/api_client.dart';
 import '../models/entry_number.dart';
 import '../models/graph_data_point.dart';
 import '../models/order_detail.dart';
+import '../models/pending_sales_order_by_customer.dart';
 import '../models/sales_order_summary.dart';
 
 class ReportServiceException implements Exception {
@@ -49,6 +50,17 @@ class ReportService {
         'year': ?year,
       });
       return (response.data as List).map((e) => GraphDataPoint.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw ReportServiceException(_messageFrom(e));
+    }
+  }
+
+  /// Sales Order lines not yet fully delivered, summed per customer — top
+  /// 10 by pending qty, for the web dashboard's bar chart.
+  Future<List<PendingSalesOrderByCustomer>> getPendingByCustomer() async {
+    try {
+      final response = await ApiClient.instance.dio.get('/api/reports/sales-orders/pending-by-customer');
+      return (response.data as List).map((e) => PendingSalesOrderByCustomer.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw ReportServiceException(_messageFrom(e));
     }
