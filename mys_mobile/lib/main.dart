@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
+import 'core/home_router.dart';
 import 'core/session.dart';
-import 'screens/landing_screen.dart';
+import 'core/web_layout_mode.dart';
 import 'screens/login_screen.dart';
 
 void main() {
@@ -41,17 +42,25 @@ class _PhoneFrame extends StatelessWidget {
     final child = this.child;
     if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth <= _maxWidth) return child;
-        return ColoredBox(
-          color: MysColors.navy900,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: _maxWidth),
-              child: Material(elevation: 12, child: child),
-            ),
-          ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: WebLayoutMode.fullWidth,
+      builder: (context, fullWidth, _) {
+        // The web app's own shell (lib/web/) renders edge-to-edge — only
+        // the still phone-styled Login/Landing screens get framed.
+        if (fullWidth) return child;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth <= _maxWidth) return child;
+            return ColoredBox(
+              color: MysColors.navy900,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
+                  child: Material(elevation: 12, child: child),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -60,8 +69,9 @@ class _PhoneFrame extends StatelessWidget {
 
 /// Checks for a stored refresh token and silently exchanges it for a fresh
 /// access token, so a returning user skips the login screen entirely and
-/// lands straight on LandingScreen. Falls back to LoginScreen if there's no
-/// stored token or the silent exchange fails (expired/revoked/etc).
+/// lands straight on HomeRouter (mobile's LandingScreen, or the web app's
+/// own shell). Falls back to LoginScreen if there's no stored token or the
+/// silent exchange fails (expired/revoked/etc).
 class _BootGate extends StatefulWidget {
   const _BootGate();
 
@@ -93,6 +103,6 @@ class _BootGateState extends State<_BootGate> {
     if (_checking) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return _authenticated ? const LandingScreen() : const LoginScreen();
+    return _authenticated ? const HomeRouter() : const LoginScreen();
   }
 }

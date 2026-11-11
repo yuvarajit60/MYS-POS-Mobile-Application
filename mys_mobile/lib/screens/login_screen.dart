@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../core/home_router.dart';
 import '../services/auth_service.dart';
-import 'landing_screen.dart';
 import 'request_otp_screen.dart';
 import 'widgets/mys_app_bar_title.dart';
 
@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await _authService.login(_usernameController.text.trim(), _passwordController.text);
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LandingScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeRouter()));
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } finally {

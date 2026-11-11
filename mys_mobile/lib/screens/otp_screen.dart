@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../core/home_router.dart';
 import '../services/auth_service.dart';
-import 'landing_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String mobileNo;
@@ -25,7 +25,7 @@ class _OtpScreenState extends State<OtpScreen> {
       await _authService.verifyOtp(widget.mobileNo, _otpController.text.trim());
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LandingScreen()),
+        MaterialPageRoute(builder: (_) => const HomeRouter()),
         (route) => false,
       );
     } on AuthException catch (e) {
