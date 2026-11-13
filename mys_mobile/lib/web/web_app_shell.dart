@@ -501,7 +501,7 @@ class _TopBar extends StatelessWidget {
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 24),
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: Color(0xFFE3E9F3),
             border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
           child: Row(
@@ -524,7 +524,7 @@ class _TopBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           alignment: Alignment.centerLeft,
           decoration: const BoxDecoration(
-            color: MysColors.bgLight,
+            color: Color(0xFFEAF2FF),
             border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
           child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
