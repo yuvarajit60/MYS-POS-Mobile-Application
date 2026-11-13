@@ -239,7 +239,7 @@ class _Sidebar extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                child: Image.asset('assets/icon/mys_logo.png', height: 64),
+                child: Image.asset('assets/icon/mys_logo.png', height: 84),
               ),
             ),
             Expanded(
@@ -501,20 +501,22 @@ class _TopBar extends StatelessWidget {
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 24),
           decoration: const BoxDecoration(
-            color: Color(0xFFE3E9F3),
-            border: Border(bottom: BorderSide(color: Colors.black12)),
+            color: MysColors.navy800,
+            border: Border(bottom: BorderSide(color: Colors.black26)),
           ),
           child: Row(
             children: [
+              const Icon(Icons.business_outlined, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
               AnimatedBuilder(
                 animation: CompanyProvider.instance,
                 builder: (context, _) => Text(
                   CompanyProvider.instance.company?.companyName ?? 'MYS Sales',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MysColors.navy900),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
               ),
               const Spacer(),
-              IconButton(icon: const Icon(Icons.logout), tooltip: 'Logout', onPressed: onLogout),
+              IconButton(icon: const Icon(Icons.logout, color: Colors.white), tooltip: 'Logout', onPressed: onLogout),
             ],
           ),
         ),
@@ -527,7 +529,14 @@ class _TopBar extends StatelessWidget {
             color: Color(0xFFEAF2FF),
             border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
-          child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.home_outlined, color: MysColors.navy900, size: 16),
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
+            ],
+          ),
         ),
       ],
     );
