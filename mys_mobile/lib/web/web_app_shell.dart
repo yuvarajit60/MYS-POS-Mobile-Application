@@ -295,7 +295,7 @@ class _Sidebar extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                child: Image.asset('assets/icon/mys_logo.png', height: collapsed ? 40 : 84),
+                child: Image.asset('assets/icon/Company Logo 1.png', height: collapsed ? 48 : 110),
               ),
             ),
             Expanded(
