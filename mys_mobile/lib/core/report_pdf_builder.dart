@@ -681,6 +681,14 @@ class ReportPdfBuilder {
                     ])
                 .toList(),
             cellAlignments: {3: pw.Alignment.centerRight, 4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight},
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.3),
+              1: const pw.FlexColumnWidth(1.3),
+              2: const pw.FlexColumnWidth(2.0),
+              3: const pw.FlexColumnWidth(1.3),
+              4: const pw.FlexColumnWidth(1.3),
+              5: const pw.FlexColumnWidth(1.5),
+            },
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
             cellStyle: const pw.TextStyle(fontSize: 9),
@@ -786,6 +794,14 @@ class ReportPdfBuilder {
                     ])
                 .toList(),
             cellAlignments: {2: pw.Alignment.centerRight, 3: pw.Alignment.centerRight, 4: pw.Alignment.centerRight, 5: pw.Alignment.centerRight},
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.4),
+              1: const pw.FlexColumnWidth(1.3),
+              2: const pw.FlexColumnWidth(0.9),
+              3: const pw.FlexColumnWidth(1.3),
+              4: const pw.FlexColumnWidth(1.3),
+              5: const pw.FlexColumnWidth(1.5),
+            },
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
             cellStyle: const pw.TextStyle(fontSize: 9),
@@ -931,6 +947,15 @@ class ReportPdfBuilder {
                     ])
                 .toList(),
             cellAlignments: {5: pw.Alignment.centerRight, 6: pw.Alignment.centerRight},
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.1),
+              1: const pw.FlexColumnWidth(1.3),
+              2: const pw.FlexColumnWidth(1.0),
+              3: const pw.FlexColumnWidth(1.1),
+              4: const pw.FlexColumnWidth(2.0),
+              5: const pw.FlexColumnWidth(1.3),
+              6: const pw.FlexColumnWidth(1.4),
+            },
             headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFDC92A)),
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.black),
             cellStyle: const pw.TextStyle(fontSize: 9),
