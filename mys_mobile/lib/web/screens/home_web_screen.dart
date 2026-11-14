@@ -341,10 +341,15 @@ class _HomeWebScreenState extends State<HomeWebScreen> {
                 if (index < 0 || index >= labels.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    labels[index],
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
+                  child: SizedBox(
+                    width: 56,
+                    child: Text(
+                      _shortLabel(labels[index]),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 );
               },
@@ -354,7 +359,9 @@ class _HomeWebScreenState extends State<HomeWebScreen> {
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
-              '$valuePrefix${rod.toY.toStringAsFixed(2)}',
+              groupIndex >= 0 && groupIndex < labels.length
+                  ? '${labels[groupIndex]}\n$valuePrefix${rod.toY.toStringAsFixed(2)}'
+                  : '$valuePrefix${rod.toY.toStringAsFixed(2)}',
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
@@ -376,6 +383,11 @@ class _HomeWebScreenState extends State<HomeWebScreen> {
       ),
     );
   }
+
+  /// Full names overlap once there are more than a handful of bars, so the
+  /// x-axis only ever shows a short form — the full name still shows in
+  /// the tooltip on hover/tap.
+  String _shortLabel(String label) => label.length > 10 ? '${label.substring(0, 10)}…' : label;
 
   String _compactNumber(double value) {
     if (value >= 100000) return '${(value / 100000).toStringAsFixed(1)}L';
