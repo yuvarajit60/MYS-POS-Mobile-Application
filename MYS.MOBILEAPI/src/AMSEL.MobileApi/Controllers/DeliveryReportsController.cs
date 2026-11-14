@@ -37,4 +37,12 @@ public class DeliveryReportsController : ControllerBase
     [HttpGet("delivery-numbers")]
     public async Task<ActionResult<IReadOnlyList<DeliveryNumberDto>>> DeliveryNumbers([FromQuery] string? search)
         => Ok(await _deliveryReportService.SearchDeliveryNumbersAsync(User.GetLocationId(), search));
+
+    [HttpGet("by-customer")]
+    public async Task<ActionResult<IReadOnlyList<GraphDataPointDto>>> ByCustomer([FromQuery] int? year)
+        => Ok(await _deliveryReportService.GetByCustomerAsync(User.GetLocationId(), year));
+
+    [HttpGet("by-product")]
+    public async Task<ActionResult<IReadOnlyList<GraphDataPointDto>>> ByProduct([FromQuery] int? year)
+        => Ok(await _deliveryReportService.GetByProductAsync(User.GetLocationId(), year));
 }

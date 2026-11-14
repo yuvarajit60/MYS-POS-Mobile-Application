@@ -11,6 +11,7 @@ public interface IReportService
     Task<IReadOnlyList<GraphDataPointDto>> GetGraphDataAsync(int locationId, string groupBy, int? year);
     Task<IReadOnlyList<EntryNumberDto>> SearchEntryNumbersAsync(int locationId, string? search);
     Task<IReadOnlyList<PendingSalesOrderByCustomerDto>> GetPendingByCustomerAsync(int locationId);
+    Task<IReadOnlyList<GraphDataPointDto>> GetPendingByProductAsync(int locationId);
 }
 
 /// <summary>
@@ -172,6 +173,26 @@ public class ReportService : IReportService
             WHERE SO.LOCATIONID = @LocationId AND SO.CANCEL = 0
               AND (SOD.SALESQTY - SOD.DELIVERYQTY) > 0
             GROUP BY C.CUSTOMERNAME
+            ORDER BY SUM(SOD.SALESQTY - SOD.DELIVERYQTY) DESC
+            """,
+            new { LocationId = locationId });
+
+        return rows.ToList();
+    }
+
+    /// <summary>Same "pending" definition as GetPendingByCustomerAsync, grouped by product instead.</summary>
+    public async Task<IReadOnlyList<GraphDataPointDto>> GetPendingByProductAsync(int locationId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GraphDataPointDto>(
+            """
+            SELECT TOP 10 ISNULL(PR.PRODUCTNAME, '') AS Label, SUM(SOD.SALESQTY - SOD.DELIVERYQTY) AS TotalAmount
+            FROM SALESORDER_DETAILS SOD
+            INNER JOIN SALESORDER SO ON SO.SALESORDERID = SOD.SALESORDERID
+            LEFT JOIN PRODUCT PR ON PR.PRODUCTID = SOD.PRODUCTID
+            WHERE SO.LOCATIONID = @LocationId AND SO.CANCEL = 0
+              AND (SOD.SALESQTY - SOD.DELIVERYQTY) > 0
+            GROUP BY PR.PRODUCTNAME
             ORDER BY SUM(SOD.SALESQTY - SOD.DELIVERYQTY) DESC
             """,
             new { LocationId = locationId });

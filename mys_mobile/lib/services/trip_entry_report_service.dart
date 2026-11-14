@@ -67,6 +67,16 @@ class TripEntryReportService {
     }
   }
 
+  /// Top 10 customers by total trip amount for the given year (home dashboard graph).
+  Future<List<GraphDataPoint>> getByCustomer({int? year}) async {
+    try {
+      final response = await ApiClient.instance.dio.get('/api/reports/trip-entries/by-customer', queryParameters: {'year': ?year});
+      return (response.data as List).map((e) => GraphDataPoint.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw TripEntryReportServiceException(_messageFrom(e));
+    }
+  }
+
   String _messageFrom(DioException e) {
     final data = e.response?.data;
     if (data is Map && data['message'] is String) return data['message'] as String;

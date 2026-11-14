@@ -44,4 +44,8 @@ public class ReportsController : ControllerBase
     [HttpGet("pending-by-customer")]
     public async Task<ActionResult<IReadOnlyList<PendingSalesOrderByCustomerDto>>> PendingByCustomer()
         => Ok(await _reportService.GetPendingByCustomerAsync(User.GetLocationId()));
+
+    [HttpGet("pending-by-product")]
+    public async Task<ActionResult<IReadOnlyList<GraphDataPointDto>>> PendingByProduct()
+        => Ok(await _reportService.GetPendingByProductAsync(User.GetLocationId()));
 }

@@ -66,6 +66,16 @@ class ReportService {
     }
   }
 
+  /// Same "pending" definition as getPendingByCustomer, grouped by product instead.
+  Future<List<GraphDataPoint>> getPendingByProduct() async {
+    try {
+      final response = await ApiClient.instance.dio.get('/api/reports/sales-orders/pending-by-product');
+      return (response.data as List).map((e) => GraphDataPoint.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw ReportServiceException(_messageFrom(e));
+    }
+  }
+
   Future<List<EntryNumber>> searchEntryNumbers(String query) async {
     try {
       final response = await ApiClient.instance.dio.get('/api/reports/sales-orders/entry-numbers', queryParameters: {

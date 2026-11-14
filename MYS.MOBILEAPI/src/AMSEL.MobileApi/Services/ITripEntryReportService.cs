@@ -10,6 +10,7 @@ public interface ITripEntryReportService
     Task<TripEntryDetailDto?> GetTripEntryDetailAsync(int locationId, int tripEntryId);
     Task<IReadOnlyList<GraphDataPointDto>> GetGraphDataAsync(int locationId, string groupBy, int? year);
     Task<IReadOnlyList<TripEntryNumberDto>> SearchTripEntryNumbersAsync(int locationId, string? search);
+    Task<IReadOnlyList<GraphDataPointDto>> GetByCustomerAsync(int locationId, int? year);
 }
 
 /// <summary>
@@ -166,6 +167,25 @@ public class TripEntryReportService : ITripEntryReportService
             ORDER BY ENTRYDATE DESC, TRIPENTRYID DESC
             """,
             new { LocationId = locationId, Search = search, Like = like });
+
+        return rows.ToList();
+    }
+
+    /// <summary>Top 10 customers by total trip amount for the given year (home dashboard graph).</summary>
+    public async Task<IReadOnlyList<GraphDataPointDto>> GetByCustomerAsync(int locationId, int? year)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GraphDataPointDto>(
+            """
+            SELECT TOP 10 C.CUSTOMERNAME AS Label, SUM(TE.NETAMOUNT) AS TotalAmount
+            FROM TRIPENTRY TE
+            INNER JOIN CUSTOMER C ON C.CUSTOMERID = TE.CUSTOMERID
+            WHERE TE.LOCATIONID = @LocationId AND TE.CANCEL = 0
+              AND YEAR(TE.ENTRYDATE) = @Year
+            GROUP BY C.CUSTOMERNAME
+            ORDER BY SUM(TE.NETAMOUNT) DESC
+            """,
+            new { LocationId = locationId, Year = year ?? DateTime.Now.Year });
 
         return rows.ToList();
     }

@@ -40,4 +40,8 @@ public class TripEntryReportsController : ControllerBase
     [HttpGet("entry-numbers")]
     public async Task<ActionResult<IReadOnlyList<TripEntryNumberDto>>> EntryNumbers([FromQuery] string? search)
         => Ok(await _tripEntryReportService.SearchTripEntryNumbersAsync(User.GetLocationId(), search));
+
+    [HttpGet("by-customer")]
+    public async Task<ActionResult<IReadOnlyList<GraphDataPointDto>>> ByCustomer([FromQuery] int? year)
+        => Ok(await _tripEntryReportService.GetByCustomerAsync(User.GetLocationId(), year));
 }

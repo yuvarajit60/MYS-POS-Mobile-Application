@@ -9,6 +9,8 @@ public interface IDeliveryReportService
     Task<IReadOnlyList<DeliverySummaryDto>> GetSummaryAsync(int locationId, int? customerId, int? driverId, string? deliveryNo, DateTime fromDate, DateTime toDate);
     Task<DeliveryDetailDto?> GetDeliveryDetailAsync(int locationId, string deliveryNo);
     Task<IReadOnlyList<DeliveryNumberDto>> SearchDeliveryNumbersAsync(int locationId, string? search);
+    Task<IReadOnlyList<GraphDataPointDto>> GetByCustomerAsync(int locationId, int? year);
+    Task<IReadOnlyList<GraphDataPointDto>> GetByProductAsync(int locationId, int? year);
 }
 
 /// <summary>
@@ -113,6 +115,46 @@ public class DeliveryReportService : IDeliveryReportService
             ORDER BY DD.DELIVERYNO DESC
             """,
             new { LocationId = locationId, Search = search, Like = like });
+
+        return rows.ToList();
+    }
+
+    /// <summary>Top 10 customers by total delivered qty for the given year (home dashboard graph).</summary>
+    public async Task<IReadOnlyList<GraphDataPointDto>> GetByCustomerAsync(int locationId, int? year)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GraphDataPointDto>(
+            """
+            SELECT TOP 10 C.CUSTOMERNAME AS Label, SUM(DD.DELIVERYQTY) AS TotalAmount
+            FROM DELIVERY_DETAILS DD
+            INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
+            INNER JOIN CUSTOMER C ON C.CUSTOMERID = SO.CUSTOMERID
+            WHERE SO.LOCATIONID = @LocationId AND (DD.CANCEL IS NULL OR DD.CANCEL = 0)
+              AND YEAR(DD.DELIVERDATE) = @Year
+            GROUP BY C.CUSTOMERNAME
+            ORDER BY SUM(DD.DELIVERYQTY) DESC
+            """,
+            new { LocationId = locationId, Year = year ?? DateTime.Now.Year });
+
+        return rows.ToList();
+    }
+
+    /// <summary>Top 10 products by total delivered qty for the given year (home dashboard graph).</summary>
+    public async Task<IReadOnlyList<GraphDataPointDto>> GetByProductAsync(int locationId, int? year)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<GraphDataPointDto>(
+            """
+            SELECT TOP 10 ISNULL(PR.PRODUCTNAME, '') AS Label, SUM(DD.DELIVERYQTY) AS TotalAmount
+            FROM DELIVERY_DETAILS DD
+            INNER JOIN SALESORDER SO ON SO.SALESORDERID = DD.SALESORDERID
+            LEFT JOIN PRODUCT PR ON PR.PRODUCTID = DD.PRODUCTID
+            WHERE SO.LOCATIONID = @LocationId AND (DD.CANCEL IS NULL OR DD.CANCEL = 0)
+              AND YEAR(DD.DELIVERDATE) = @Year
+            GROUP BY PR.PRODUCTNAME
+            ORDER BY SUM(DD.DELIVERYQTY) DESC
+            """,
+            new { LocationId = locationId, Year = year ?? DateTime.Now.Year });
 
         return rows.ToList();
     }

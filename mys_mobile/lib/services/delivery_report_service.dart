@@ -4,6 +4,7 @@ import '../core/api_client.dart';
 import '../models/delivery_detail.dart';
 import '../models/delivery_number.dart';
 import '../models/delivery_summary.dart';
+import '../models/graph_data_point.dart';
 
 class DeliveryReportServiceException implements Exception {
   final String message;
@@ -51,6 +52,26 @@ class DeliveryReportService {
         'search': query,
       });
       return (response.data as List).map((e) => DeliveryNumber.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw DeliveryReportServiceException(_messageFrom(e));
+    }
+  }
+
+  /// Top 10 customers by total delivered qty for the given year (home dashboard graph).
+  Future<List<GraphDataPoint>> getByCustomer({int? year}) async {
+    try {
+      final response = await ApiClient.instance.dio.get('/api/reports/deliveries/by-customer', queryParameters: {'year': ?year});
+      return (response.data as List).map((e) => GraphDataPoint.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw DeliveryReportServiceException(_messageFrom(e));
+    }
+  }
+
+  /// Top 10 products by total delivered qty for the given year (home dashboard graph).
+  Future<List<GraphDataPoint>> getByProduct({int? year}) async {
+    try {
+      final response = await ApiClient.instance.dio.get('/api/reports/deliveries/by-product', queryParameters: {'year': ?year});
+      return (response.data as List).map((e) => GraphDataPoint.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw DeliveryReportServiceException(_messageFrom(e));
     }
