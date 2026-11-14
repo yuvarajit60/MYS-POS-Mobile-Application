@@ -256,7 +256,7 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
 
   void _onDeleteLine(int index) => setState(() => _lines.removeAt(index));
 
-  Future<void> _saveAndClose() async {
+  Future<void> _save() async {
     if (_selectedDriver == null) {
       _showMessage('Select a driver.');
       return;
@@ -290,19 +290,25 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
       );
       if (!mounted) return;
       _showMessage('Trip entry ${result.entryNo} saved.');
-      setState(() {
-        _selectedCustomer = null;
-        _selectedDriver = null;
-        _selectedSite = null;
-        _driverVehicle = null;
-        _tripNoController.clear();
-        _lines.clear();
-      });
+      _resetForm();
     } on TripEntryException catch (e) {
       _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _close() => _resetForm();
+
+  void _resetForm() {
+    setState(() {
+      _selectedCustomer = null;
+      _selectedDriver = null;
+      _selectedSite = null;
+      _driverVehicle = null;
+      _tripNoController.clear();
+      _lines.clear();
+    });
   }
 
   void _showMessage(String message) {
@@ -426,16 +432,30 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _saving ? null : _saveAndClose,
-                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Save and Close'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving ? null : _close,
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                            child: const Text('Close'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _saving ? null : _save,
+                            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Save'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

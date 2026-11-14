@@ -124,15 +124,21 @@ class _SalesEntryWebScreenState extends State<SalesEntryWebScreen> {
           ? 'Sales entry ${entryNumbers.first} saved.'
           : '${entryNumbers.length} sales entries saved: ${entryNumbers.join(', ')}';
       _showMessage(message);
-      setState(() {
-        _results = null;
-        _selectedKeys.clear();
-      });
+      _resetSelection();
     } on SalesEntryServiceException catch (e) {
       _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _close() => _resetSelection();
+
+  void _resetSelection() {
+    setState(() {
+      _results = null;
+      _selectedKeys.clear();
+    });
   }
 
   void _showMessage(String message) {
@@ -232,16 +238,30 @@ class _SalesEntryWebScreenState extends State<SalesEntryWebScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: busy || _selectedKeys.isEmpty ? null : _save,
-                            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                            child: _saving
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Text('Save and Close'),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: busy ? null : _close,
+                                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                                  child: const Text('Close'),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: busy || _selectedKeys.isEmpty ? null : _save,
+                                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                                  child: _saving
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Text('Save'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
