@@ -21,7 +21,8 @@ import '../widgets/web_search_picker.dart';
 /// Driver -> Customer -> Site selection order and the same shared
 /// TripEntryLineItemsGrid (a plain data-grid widget, reused verbatim).
 class TripEntryWebScreen extends StatefulWidget {
-  const TripEntryWebScreen({super.key});
+  final VoidCallback onClose;
+  const TripEntryWebScreen({super.key, required this.onClose});
 
   @override
   State<TripEntryWebScreen> createState() => _TripEntryWebScreenState();
@@ -298,7 +299,7 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
     }
   }
 
-  void _close() => _resetForm();
+  void _close() => widget.onClose();
 
   void _resetForm() {
     setState(() {

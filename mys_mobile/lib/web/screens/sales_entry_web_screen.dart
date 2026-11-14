@@ -15,7 +15,8 @@ import '../widgets/web_search_picker.dart';
 /// TripEntryDetailScreen) are reused as-is via a normal page push — purely
 /// informational, so a full re-skin isn't needed there yet.
 class SalesEntryWebScreen extends StatefulWidget {
-  const SalesEntryWebScreen({super.key});
+  final VoidCallback onClose;
+  const SalesEntryWebScreen({super.key, required this.onClose});
 
   @override
   State<SalesEntryWebScreen> createState() => _SalesEntryWebScreenState();
@@ -132,7 +133,7 @@ class _SalesEntryWebScreenState extends State<SalesEntryWebScreen> {
     }
   }
 
-  void _close() => _resetSelection();
+  void _close() => widget.onClose();
 
   void _resetSelection() {
     setState(() {

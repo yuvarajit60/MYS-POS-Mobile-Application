@@ -21,7 +21,8 @@ import '../widgets/web_search_picker.dart';
 /// Inline "Add New" during picking opens the web form dialogs instead of
 /// pushing mobile screens.
 class SalesOrderEntryWebScreen extends StatefulWidget {
-  const SalesOrderEntryWebScreen({super.key});
+  final VoidCallback onClose;
+  const SalesOrderEntryWebScreen({super.key, required this.onClose});
 
   @override
   State<SalesOrderEntryWebScreen> createState() => _SalesOrderEntryWebScreenState();
@@ -211,7 +212,7 @@ class _SalesOrderEntryWebScreenState extends State<SalesOrderEntryWebScreen> {
     }
   }
 
-  void _close() => _resetForm();
+  void _close() => widget.onClose();
 
   void _resetForm() {
     setState(() {

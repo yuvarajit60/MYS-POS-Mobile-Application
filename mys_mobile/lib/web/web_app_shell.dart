@@ -101,8 +101,63 @@ const Map<_WebSection, IconData> _sectionIcons = {
   _WebSection.headMaster: Icons.account_balance_wallet_outlined,
 };
 
+String _titleFor(_WebSection section) {
+  switch (section) {
+    case _WebSection.home:
+      return 'Home';
+    case _WebSection.product:
+      return 'Product';
+    case _WebSection.customer:
+      return 'Customer';
+    case _WebSection.site:
+      return 'Site';
+    case _WebSection.customerSiteMapping:
+      return 'Customer Site Mapping';
+    case _WebSection.area:
+      return 'Area';
+    case _WebSection.vehicleMapping:
+      return 'Vehicle Mapping';
+    case _WebSection.employee:
+      return 'Employee';
+    case _WebSection.headMaster:
+      return 'Head Master';
+    case _WebSection.salesOrder:
+      return 'Sales Order';
+    case _WebSection.delivery:
+      return 'Delivery Entry';
+    case _WebSection.tripEntry:
+      return 'Trip Entry';
+    case _WebSection.payment:
+      return 'Payment Entry';
+    case _WebSection.salesEntry:
+      return 'Sales Entry';
+    case _WebSection.incomeExpense:
+      return 'Income or Expenses';
+    case _WebSection.cancelEntry:
+      return 'Cancel Entry';
+    case _WebSection.salesOrderReport:
+      return 'Sales Order Report';
+    case _WebSection.salesReport:
+      return 'Sales Report';
+    case _WebSection.tripEntryReport:
+      return 'Trip Entry Report';
+    case _WebSection.deliveryReport:
+      return 'Delivery Report';
+    case _WebSection.customerLedger:
+      return 'Customer Ledger';
+    case _WebSection.paymentReport:
+      return 'Payment Report';
+    case _WebSection.incomeExpenseReport:
+      return 'Income and Expenses Report';
+  }
+}
+
 class _WebAppShellState extends State<WebAppShell> {
-  _WebSection _selected = _WebSection.home;
+  /// Sections currently open as tabs, in the order they were opened. Home
+  /// is always implicitly available and never appears here — it's the
+  /// permanent first tab and can't be closed.
+  final List<_WebSection> _openTabs = [];
+  _WebSection _active = _WebSection.home;
   bool _sidebarCollapsed = false;
 
   @override
@@ -127,110 +182,91 @@ class _WebAppShellState extends State<WebAppShell> {
     );
   }
 
-  String get _title {
-    switch (_selected) {
-      case _WebSection.home:
-        return 'Home';
-      case _WebSection.product:
-        return 'Product';
-      case _WebSection.customer:
-        return 'Customer';
-      case _WebSection.site:
-        return 'Site';
-      case _WebSection.customerSiteMapping:
-        return 'Customer Site Mapping';
-      case _WebSection.area:
-        return 'Area';
-      case _WebSection.vehicleMapping:
-        return 'Vehicle Mapping';
-      case _WebSection.employee:
-        return 'Employee';
-      case _WebSection.headMaster:
-        return 'Head Master';
-      case _WebSection.salesOrder:
-        return 'Sales Order';
-      case _WebSection.delivery:
-        return 'Delivery Entry';
-      case _WebSection.tripEntry:
-        return 'Trip Entry';
-      case _WebSection.payment:
-        return 'Payment Entry';
-      case _WebSection.salesEntry:
-        return 'Sales Entry';
-      case _WebSection.incomeExpense:
-        return 'Income or Expenses';
-      case _WebSection.cancelEntry:
-        return 'Cancel Entry';
-      case _WebSection.salesOrderReport:
-        return 'Sales Order Report';
-      case _WebSection.salesReport:
-        return 'Sales Report';
-      case _WebSection.tripEntryReport:
-        return 'Trip Entry Report';
-      case _WebSection.deliveryReport:
-        return 'Delivery Report';
-      case _WebSection.customerLedger:
-        return 'Customer Ledger';
-      case _WebSection.paymentReport:
-        return 'Payment Report';
-      case _WebSection.incomeExpenseReport:
-        return 'Income and Expenses Report';
-    }
+  /// Sidebar click: switch to this section's tab, opening one first if it
+  /// isn't already open. Re-clicking an already-open section just brings
+  /// its existing tab (and whatever it was left mid-fill) back to front.
+  void _openSection(_WebSection section) {
+    setState(() {
+      if (section != _WebSection.home && !_openTabs.contains(section)) {
+        _openTabs.add(section);
+      }
+      _active = section;
+    });
   }
 
-  Widget get _content {
-    switch (_selected) {
+  /// Tab's close button, or an entry screen's own Close button (which
+  /// forwards to this via onClose). Falls back to the tab that was to its
+  /// left, or Home once no tabs are left.
+  void _closeTab(_WebSection section) {
+    setState(() {
+      final index = _openTabs.indexOf(section);
+      if (index == -1) return;
+      _openTabs.removeAt(index);
+      if (_active == section) {
+        _active = _openTabs.isEmpty ? _WebSection.home : _openTabs[index == 0 ? 0 : index - 1];
+      }
+    });
+  }
+
+  Widget _contentFor(_WebSection section) {
+    switch (section) {
       case _WebSection.home:
-        return const HomeWebScreen();
+        return const HomeWebScreen(key: ValueKey(_WebSection.home));
       case _WebSection.product:
-        return const ProductMasterWebScreen();
+        return const ProductMasterWebScreen(key: ValueKey(_WebSection.product));
       case _WebSection.customer:
-        return const CustomerMasterWebScreen();
+        return const CustomerMasterWebScreen(key: ValueKey(_WebSection.customer));
       case _WebSection.site:
-        return const SiteMasterWebScreen();
+        return const SiteMasterWebScreen(key: ValueKey(_WebSection.site));
       case _WebSection.customerSiteMapping:
-        return const CustomerSiteMappingWebScreen();
+        return const CustomerSiteMappingWebScreen(key: ValueKey(_WebSection.customerSiteMapping));
       case _WebSection.area:
-        return const AreaMasterWebScreen();
+        return const AreaMasterWebScreen(key: ValueKey(_WebSection.area));
       case _WebSection.vehicleMapping:
-        return const VehicleMappingWebScreen();
+        return const VehicleMappingWebScreen(key: ValueKey(_WebSection.vehicleMapping));
       case _WebSection.employee:
-        return const EmployeeMasterWebScreen();
+        return const EmployeeMasterWebScreen(key: ValueKey(_WebSection.employee));
       case _WebSection.headMaster:
-        return const HeadMasterWebScreen();
+        return const HeadMasterWebScreen(key: ValueKey(_WebSection.headMaster));
       case _WebSection.salesOrder:
-        return const SalesOrderEntryWebScreen();
+        return SalesOrderEntryWebScreen(key: const ValueKey(_WebSection.salesOrder), onClose: () => _closeTab(section));
       case _WebSection.delivery:
-        return const DeliveryEntryWebScreen();
+        return const DeliveryEntryWebScreen(key: ValueKey(_WebSection.delivery));
       case _WebSection.tripEntry:
-        return const TripEntryWebScreen();
+        return TripEntryWebScreen(key: const ValueKey(_WebSection.tripEntry), onClose: () => _closeTab(section));
       case _WebSection.payment:
-        return const PaymentEntryWebScreen();
+        return const PaymentEntryWebScreen(key: ValueKey(_WebSection.payment));
       case _WebSection.salesEntry:
-        return const SalesEntryWebScreen();
+        return SalesEntryWebScreen(key: const ValueKey(_WebSection.salesEntry), onClose: () => _closeTab(section));
       case _WebSection.incomeExpense:
-        return const IncomeExpenseEntryWebScreen();
+        return const IncomeExpenseEntryWebScreen(key: ValueKey(_WebSection.incomeExpense));
       case _WebSection.cancelEntry:
-        return const CancelEntryWebScreen();
+        return const CancelEntryWebScreen(key: ValueKey(_WebSection.cancelEntry));
       case _WebSection.salesOrderReport:
-        return const SalesOrderReportWebScreen();
+        return const SalesOrderReportWebScreen(key: ValueKey(_WebSection.salesOrderReport));
       case _WebSection.salesReport:
-        return const SalesReportWebScreen();
+        return const SalesReportWebScreen(key: ValueKey(_WebSection.salesReport));
       case _WebSection.tripEntryReport:
-        return const TripEntryReportWebScreen();
+        return const TripEntryReportWebScreen(key: ValueKey(_WebSection.tripEntryReport));
       case _WebSection.deliveryReport:
-        return const DeliveryReportWebScreen();
+        return const DeliveryReportWebScreen(key: ValueKey(_WebSection.deliveryReport));
       case _WebSection.customerLedger:
-        return const LedgerReportWebScreen();
+        return const LedgerReportWebScreen(key: ValueKey(_WebSection.customerLedger));
       case _WebSection.paymentReport:
-        return const PaymentReportWebScreen();
+        return const PaymentReportWebScreen(key: ValueKey(_WebSection.paymentReport));
       case _WebSection.incomeExpenseReport:
-        return const IncomeExpenseReportWebScreen();
+        return const IncomeExpenseReportWebScreen(key: ValueKey(_WebSection.incomeExpenseReport));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // IndexedStack keeps every open tab's widget mounted (just hidden) so
+    // a partially filled-in entry screen stays exactly as it was when you
+    // switch away to another tab and back, instead of being rebuilt fresh.
+    final stackChildren = [_contentFor(_WebSection.home), for (final s in _openTabs) _contentFor(s)];
+    final activeIndex = _active == _WebSection.home ? 0 : 1 + _openTabs.indexOf(_active);
+
     return Scaffold(
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -240,22 +276,24 @@ class _WebAppShellState extends State<WebAppShell> {
             curve: Curves.easeInOut,
             width: _sidebarCollapsed ? 76 : 260,
             child: _Sidebar(
-              selected: _selected,
+              selected: _active,
               collapsed: _sidebarCollapsed,
-              onSelect: (s) => setState(() => _selected = s),
+              onSelect: _openSection,
             ),
           ),
           Expanded(
             child: Column(
               children: [
                 _TopBar(
-                  title: _title,
-                  icon: _sectionIcons[_selected] ?? Icons.circle_outlined,
+                  openTabs: _openTabs,
+                  active: _active,
+                  onSelectTab: _openSection,
+                  onCloseTab: _closeTab,
                   sidebarCollapsed: _sidebarCollapsed,
                   onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                   onLogout: _logout,
                 ),
-                Expanded(child: _content),
+                Expanded(child: IndexedStack(index: activeIndex, children: stackChildren)),
               ],
             ),
           ),
@@ -559,14 +597,18 @@ class _NavItem extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  final String title;
-  final IconData icon;
+  final List<_WebSection> openTabs;
+  final _WebSection active;
+  final ValueChanged<_WebSection> onSelectTab;
+  final ValueChanged<_WebSection> onCloseTab;
   final bool sidebarCollapsed;
   final VoidCallback onToggleSidebar;
   final VoidCallback onLogout;
   const _TopBar({
-    required this.title,
-    required this.icon,
+    required this.openTabs,
+    required this.active,
+    required this.onSelectTab,
+    required this.onCloseTab,
     required this.sidebarCollapsed,
     required this.onToggleSidebar,
     required this.onLogout,
@@ -608,22 +650,90 @@ class _TopBar extends StatelessWidget {
         Container(
           height: 44,
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          alignment: Alignment.centerLeft,
           decoration: const BoxDecoration(
             color: Color(0xFFEAF2FF),
             border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: MysColors.navy900, size: 16),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _TabChip(
+                  section: _WebSection.home,
+                  active: active == _WebSection.home,
+                  closable: false,
+                  onTap: () => onSelectTab(_WebSection.home),
+                  onClose: null,
+                ),
+                for (final s in openTabs)
+                  _TabChip(
+                    section: s,
+                    active: active == s,
+                    closable: true,
+                    onTap: () => onSelectTab(s),
+                    onClose: () => onCloseTab(s),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// One tab in the top bar's tab strip — the active one rendered flush
+/// white against the content area below it, inactive ones dimmed, with a
+/// small close button on everything except the permanent Home tab.
+class _TabChip extends StatelessWidget {
+  final _WebSection section;
+  final bool active;
+  final bool closable;
+  final VoidCallback onTap;
+  final VoidCallback? onClose;
+
+  const _TabChip({
+    required this.section,
+    required this.active,
+    required this.closable,
+    required this.onTap,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        padding: EdgeInsets.fromLTRB(16, 0, closable ? 8 : 16, 0),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          border: Border(right: const BorderSide(color: Colors.black12), top: BorderSide(color: active ? MysColors.green500 : Colors.transparent, width: 2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_sectionIcons[section] ?? Icons.circle_outlined, size: 16, color: MysColors.navy900),
+            const SizedBox(width: 8),
+            Text(
+              _titleFor(section),
+              style: TextStyle(fontSize: 14, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: MysColors.navy900),
+            ),
+            if (closable) ...[
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: onClose,
+                borderRadius: BorderRadius.circular(10),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 14, color: MysColors.navy900),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
