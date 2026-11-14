@@ -71,8 +71,39 @@ enum _WebSection {
   incomeExpenseReport,
 }
 
+/// Single source of truth for each section's icon — read by both the
+/// sidebar nav items and the page-title bar, so the title bar always shows
+/// the icon matching whichever section is actually selected instead of a
+/// generic one.
+const Map<_WebSection, IconData> _sectionIcons = {
+  _WebSection.home: Icons.home_outlined,
+  _WebSection.salesOrder: Icons.description_outlined,
+  _WebSection.tripEntry: Icons.local_shipping_outlined,
+  _WebSection.delivery: Icons.local_shipping,
+  _WebSection.payment: Icons.payments_outlined,
+  _WebSection.cancelEntry: Icons.cancel_outlined,
+  _WebSection.salesEntry: Icons.fact_check_outlined,
+  _WebSection.incomeExpense: Icons.account_balance_wallet_outlined,
+  _WebSection.salesOrderReport: Icons.description_outlined,
+  _WebSection.salesReport: Icons.receipt_long_outlined,
+  _WebSection.tripEntryReport: Icons.local_shipping_outlined,
+  _WebSection.deliveryReport: Icons.local_shipping,
+  _WebSection.customerLedger: Icons.account_balance_outlined,
+  _WebSection.paymentReport: Icons.payments_outlined,
+  _WebSection.incomeExpenseReport: Icons.account_balance_wallet_outlined,
+  _WebSection.product: Icons.inventory_2_outlined,
+  _WebSection.customer: Icons.people_alt_outlined,
+  _WebSection.site: Icons.location_on_outlined,
+  _WebSection.customerSiteMapping: Icons.link_outlined,
+  _WebSection.area: Icons.map_outlined,
+  _WebSection.vehicleMapping: Icons.directions_car_outlined,
+  _WebSection.employee: Icons.badge_outlined,
+  _WebSection.headMaster: Icons.account_balance_wallet_outlined,
+};
+
 class _WebAppShellState extends State<WebAppShell> {
   _WebSection _selected = _WebSection.home;
+  bool _sidebarCollapsed = false;
 
   @override
   void initState() {
@@ -204,11 +235,26 @@ class _WebAppShellState extends State<WebAppShell> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Sidebar(selected: _selected, onSelect: (s) => setState(() => _selected = s)),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            width: _sidebarCollapsed ? 76 : 260,
+            child: _Sidebar(
+              selected: _selected,
+              collapsed: _sidebarCollapsed,
+              onSelect: (s) => setState(() => _selected = s),
+            ),
+          ),
           Expanded(
             child: Column(
               children: [
-                _TopBar(title: _title, onLogout: _logout),
+                _TopBar(
+                  title: _title,
+                  icon: _sectionIcons[_selected] ?? Icons.circle_outlined,
+                  sidebarCollapsed: _sidebarCollapsed,
+                  onToggleSidebar: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                  onLogout: _logout,
+                ),
                 Expanded(child: _content),
               ],
             ),
@@ -221,25 +267,35 @@ class _WebAppShellState extends State<WebAppShell> {
 
 class _Sidebar extends StatelessWidget {
   final _WebSection selected;
+  final bool collapsed;
   final ValueChanged<_WebSection> onSelect;
-  const _Sidebar({required this.selected, required this.onSelect});
+  const _Sidebar({required this.selected, required this.collapsed, required this.onSelect});
+
+  Widget _sectionLabel(String text) => collapsed
+      ? const SizedBox(height: 16)
+      : Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+          ),
+        );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
       color: MysColors.navy900,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+              padding: EdgeInsets.fromLTRB(collapsed ? 10 : 20, 24, collapsed ? 10 : 20, 28),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                child: Image.asset('assets/icon/mys_logo.png', height: 84),
+                child: Image.asset('assets/icon/mys_logo.png', height: collapsed ? 40 : 84),
               ),
             ),
             Expanded(
@@ -247,20 +303,16 @@ class _Sidebar extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.home_outlined,
                     label: 'Home',
                     color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.home,
                     onTap: () => onSelect(_WebSection.home),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
-                    child: Text(
-                      'ENTRIES',
-                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
-                    ),
-                  ),
+                  _sectionLabel('ENTRIES'),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.description_outlined,
                     label: 'Sales Order',
                     color: const Color(0xFF00B894),
@@ -268,6 +320,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.salesOrder),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.local_shipping_outlined,
                     label: 'Trip Entry',
                     color: const Color(0xFF00CEC9),
@@ -275,6 +328,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.tripEntry),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.local_shipping,
                     label: 'Delivery Entry',
                     color: const Color(0xFF55EFC4),
@@ -282,6 +336,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.delivery),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.payments_outlined,
                     label: 'Payment Entry',
                     color: const Color(0xFF2ECC71),
@@ -289,6 +344,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.payment),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.cancel_outlined,
                     label: 'Cancel Entry',
                     color: const Color(0xFFE17055),
@@ -296,6 +352,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.cancelEntry),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.fact_check_outlined,
                     label: 'Sales Entry',
                     color: const Color(0xFF00B894),
@@ -303,20 +360,16 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.salesEntry),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Income or Expenses',
                     color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.incomeExpense,
                     onTap: () => onSelect(_WebSection.incomeExpense),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-                    child: Text(
-                      'REPORTS',
-                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
-                    ),
-                  ),
+                  _sectionLabel('REPORTS'),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.description_outlined,
                     label: 'Sales Order Report',
                     color: const Color(0xFF0984E3),
@@ -324,6 +377,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.salesOrderReport),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.receipt_long_outlined,
                     label: 'Sales Report',
                     color: const Color(0xFF74B9FF),
@@ -331,6 +385,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.salesReport),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.local_shipping_outlined,
                     label: 'Trip Entry Report',
                     color: const Color(0xFF00CEC9),
@@ -338,6 +393,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.tripEntryReport),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.local_shipping,
                     label: 'Delivery Report',
                     color: const Color(0xFF55EFC4),
@@ -345,6 +401,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.deliveryReport),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.account_balance_outlined,
                     label: 'Customer Ledger',
                     color: const Color(0xFF6C5CE7),
@@ -352,6 +409,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.customerLedger),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.payments_outlined,
                     label: 'Payment Report',
                     color: const Color(0xFF2ECC71),
@@ -359,20 +417,16 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.paymentReport),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Income and Expenses Report',
                     color: const Color(0xFFFDCB6E),
                     selected: selected == _WebSection.incomeExpenseReport,
                     onTap: () => onSelect(_WebSection.incomeExpenseReport),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-                    child: Text(
-                      'MASTERS',
-                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.1),
-                    ),
-                  ),
+                  _sectionLabel('MASTERS'),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.inventory_2_outlined,
                     label: 'Product',
                     color: const Color(0xFF6C5CE7),
@@ -380,6 +434,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.product),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.people_alt_outlined,
                     label: 'Customer',
                     color: const Color(0xFFA29BFE),
@@ -387,6 +442,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.customer),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.location_on_outlined,
                     label: 'Site',
                     color: const Color(0xFFFF7675),
@@ -394,6 +450,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.site),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.link_outlined,
                     label: 'Customer Site Mapping',
                     color: const Color(0xFFFD79A8),
@@ -401,6 +458,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.customerSiteMapping),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.map_outlined,
                     label: 'Area',
                     color: const Color(0xFF00B894),
@@ -408,6 +466,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.area),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.directions_car_outlined,
                     label: 'Vehicle Mapping',
                     color: const Color(0xFFE17055),
@@ -415,6 +474,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.vehicleMapping),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.badge_outlined,
                     label: 'Employee',
                     color: const Color(0xFF0984E3),
@@ -422,6 +482,7 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(_WebSection.employee),
                   ),
                   _NavItem(
+                    collapsed: collapsed,
                     icon: Icons.account_balance_wallet_outlined,
                     label: 'Head Master',
                     color: const Color(0xFFFDCB6E),
@@ -443,6 +504,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final Color color;
   final bool selected;
+  final bool collapsed;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -450,12 +512,33 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.color,
     required this.selected,
+    required this.collapsed,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final row = Row(
+      mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 20),
+        if (!collapsed) ...[
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.white70,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final button = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
         color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
@@ -465,33 +548,29 @@ class _NavItem extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : Colors.white70,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: row,
           ),
         ),
       ),
     );
+
+    return collapsed ? Tooltip(message: label, child: button) : button;
   }
 }
 
 class _TopBar extends StatelessWidget {
   final String title;
+  final IconData icon;
+  final bool sidebarCollapsed;
+  final VoidCallback onToggleSidebar;
   final VoidCallback onLogout;
-  const _TopBar({required this.title, required this.onLogout});
+  const _TopBar({
+    required this.title,
+    required this.icon,
+    required this.sidebarCollapsed,
+    required this.onToggleSidebar,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -499,13 +578,19 @@ class _TopBar extends StatelessWidget {
       children: [
         Container(
           height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: const BoxDecoration(
             color: MysColors.navy800,
             border: Border(bottom: BorderSide(color: Colors.black26)),
           ),
           child: Row(
             children: [
+              IconButton(
+                icon: Icon(sidebarCollapsed ? Icons.menu : Icons.menu_open, color: Colors.white),
+                tooltip: sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+                onPressed: onToggleSidebar,
+              ),
+              const SizedBox(width: 4),
               const Icon(Icons.business_outlined, color: Colors.white, size: 18),
               const SizedBox(width: 8),
               AnimatedBuilder(
@@ -532,7 +617,7 @@ class _TopBar extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.home_outlined, color: MysColors.navy900, size: 16),
+              Icon(icon, color: MysColors.navy900, size: 16),
               const SizedBox(width: 8),
               Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MysColors.navy900)),
             ],

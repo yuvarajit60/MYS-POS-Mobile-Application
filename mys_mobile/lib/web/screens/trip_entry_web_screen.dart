@@ -323,7 +323,7 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 1400),
           child: SingleChildScrollView(
             child: Card(
               child: Padding(

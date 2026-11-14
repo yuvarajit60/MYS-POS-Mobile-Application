@@ -220,7 +220,7 @@ class _DeliveryEntryWebScreenState extends State<DeliveryEntryWebScreen> {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 820),
+          constraints: const BoxConstraints(maxWidth: 1400),
           child: SingleChildScrollView(
             child: Card(
               child: Padding(

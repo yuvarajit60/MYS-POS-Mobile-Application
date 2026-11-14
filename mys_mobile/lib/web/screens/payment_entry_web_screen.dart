@@ -110,7 +110,7 @@ class _PaymentEntryWebScreenState extends State<PaymentEntryWebScreen> {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: const BoxConstraints(maxWidth: 1400),
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(24),
