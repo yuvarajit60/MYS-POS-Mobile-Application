@@ -8,6 +8,7 @@ import '../../services/employee_service.dart';
 import '../../services/income_expense_service.dart';
 import '../../services/vehicle_service.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 const List<String> _incomeExpenseTypes = ['Expenses', 'Income'];
 const String _employeeMappedMaster = 'Employee';
@@ -146,7 +147,7 @@ class _IncomeExpenseEntryWebScreenState extends State<IncomeExpenseEntryWebScree
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

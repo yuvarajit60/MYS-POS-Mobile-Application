@@ -16,6 +16,7 @@ import '../../services/trip_entry_service.dart';
 import '../widgets/customer_form_dialog.dart';
 import '../widgets/site_form_dialog.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of create_trip_entry_screen.dart (mobile) — same
 /// Driver -> Customer -> Site selection order and the same shared
@@ -313,7 +314,7 @@ class _TripEntryWebScreenState extends State<TripEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

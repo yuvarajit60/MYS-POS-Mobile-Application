@@ -4,6 +4,7 @@ import '../../models/site_detail.dart';
 import '../../services/area_service.dart';
 import '../../services/site_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of site_form_screen.dart (mobile) — Site Name + Area
 /// only; Customer mapping is a separate master (Customer Site Mapping),
@@ -50,7 +51,7 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedArea == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select an area.')));
+      showWebMessage(context, 'Select an area.');
       return;
     }
 
@@ -65,7 +66,7 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
       Navigator.of(context).pop<SiteDetail>(site);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -95,7 +96,7 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
       Navigator.of(context).pop(true);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }

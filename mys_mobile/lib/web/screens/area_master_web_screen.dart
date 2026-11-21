@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/area.dart';
 import '../../services/area_service.dart';
 import '../widgets/area_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Area master screen — same search/table/dialog pattern as the
 /// other web masters. No getById needed (Area already carries its City).
@@ -87,7 +88,7 @@ class _AreaMasterWebScreenState extends State<AreaMasterWebScreen> {
       _runSearch(_searchController.text);
     } on AreaServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

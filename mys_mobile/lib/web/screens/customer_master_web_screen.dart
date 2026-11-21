@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/customer.dart';
 import '../../services/customer_service.dart';
 import '../widgets/customer_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Customer master screen — same search/table/dialog pattern as
 /// HeadMasterWebScreen/ProductMasterWebScreen. Same CustomerService/
@@ -69,7 +70,7 @@ class _CustomerMasterWebScreenState extends State<CustomerMasterWebScreen> {
       if (saved != null) _runSearch(_searchController.text);
     } on CustomerServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 
@@ -95,7 +96,7 @@ class _CustomerMasterWebScreenState extends State<CustomerMasterWebScreen> {
       _runSearch(_searchController.text);
     } on CustomerServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/employee.dart';
 import '../../services/employee_service.dart';
 import '../widgets/employee_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Employee master screen — same search/table/dialog pattern as
 /// the other web masters. Same EmployeeService/Employee model as mobile.
@@ -68,7 +69,7 @@ class _EmployeeMasterWebScreenState extends State<EmployeeMasterWebScreen> {
       if (saved != null) _runSearch(_searchController.text);
     } on EmployeeServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 
@@ -94,7 +95,7 @@ class _EmployeeMasterWebScreenState extends State<EmployeeMasterWebScreen> {
       _runSearch(_searchController.text);
     } on EmployeeServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

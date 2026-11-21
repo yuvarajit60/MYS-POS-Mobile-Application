@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/head_detail.dart';
 import '../../services/head_service.dart';
+import '../web_toast.dart';
 
 const List<String> _incomeExpenseTypes = ['Expenses', 'Income'];
 
@@ -70,7 +71,7 @@ class _HeadFormDialogState extends State<HeadFormDialog> {
       Navigator.of(context).pop(true);
     } on HeadServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -100,7 +101,7 @@ class _HeadFormDialogState extends State<HeadFormDialog> {
       Navigator.of(context).pop(true);
     } on HeadServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }

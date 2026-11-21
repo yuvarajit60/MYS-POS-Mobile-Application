@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/head.dart';
 import '../../services/head_service.dart';
 import '../widgets/head_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Head Master screen — a data table with inline row actions and
 /// an Add button opening a modal form, instead of the mobile app's
@@ -70,7 +71,7 @@ class _HeadMasterWebScreenState extends State<HeadMasterWebScreen> {
       if (saved == true) _runSearch(_searchController.text);
     } on HeadServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 
@@ -96,7 +97,7 @@ class _HeadMasterWebScreenState extends State<HeadMasterWebScreen> {
       _runSearch(_searchController.text);
     } on HeadServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

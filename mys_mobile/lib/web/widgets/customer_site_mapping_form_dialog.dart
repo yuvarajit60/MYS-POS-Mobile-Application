@@ -4,6 +4,7 @@ import '../../models/site.dart';
 import '../../services/customer_service.dart';
 import '../../services/site_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of customer_site_mapping_form_screen.dart (mobile) — see
 /// that file's header for why this has no mapping ID of its own: a site
@@ -69,11 +70,11 @@ class _CustomerSiteMappingFormDialogState extends State<CustomerSiteMappingFormD
 
   Future<void> _save() async {
     if (_selectedSite == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a site.')));
+      showWebMessage(context, 'Select a site.');
       return;
     }
     if (_selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a customer.')));
+      showWebMessage(context, 'Select a customer.');
       return;
     }
 
@@ -84,7 +85,7 @@ class _CustomerSiteMappingFormDialogState extends State<CustomerSiteMappingFormD
       Navigator.of(context).pop(true);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -114,7 +115,7 @@ class _CustomerSiteMappingFormDialogState extends State<CustomerSiteMappingFormD
       Navigator.of(context).pop(true);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _unmapping = false);
     }

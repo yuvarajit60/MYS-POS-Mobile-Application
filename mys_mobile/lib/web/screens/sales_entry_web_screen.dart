@@ -8,6 +8,7 @@ import '../../screens/trip_entry_detail_screen.dart';
 import '../../services/customer_service.dart';
 import '../../services/sales_entry_service.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of create_sales_entry_screen.dart (mobile) — see that
 /// file's header for why each selected row becomes its own separate Sales
@@ -143,7 +144,7 @@ class _SalesEntryWebScreenState extends State<SalesEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

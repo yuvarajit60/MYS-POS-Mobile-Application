@@ -7,6 +7,7 @@ import '../../services/employee_service.dart';
 import '../../services/employee_vehicle_mapping_service.dart';
 import '../../services/vehicle_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// See vehicle_mapping_form_screen.dart (mobile) for the same fields/logic
 /// as a field-by-field push screen; this is the web equivalent as a modal
@@ -89,11 +90,11 @@ class _VehicleMappingFormDialogState extends State<VehicleMappingFormDialog> {
 
   Future<void> _save() async {
     if (_selectedDriver == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a driver.')));
+      showWebMessage(context, 'Select a driver.');
       return;
     }
     if (_selectedVehicle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a vehicle.')));
+      showWebMessage(context, 'Select a vehicle.');
       return;
     }
 
@@ -119,7 +120,7 @@ class _VehicleMappingFormDialogState extends State<VehicleMappingFormDialog> {
       Navigator.of(context).pop(true);
     } on EmployeeVehicleMappingServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -149,7 +150,7 @@ class _VehicleMappingFormDialogState extends State<VehicleMappingFormDialog> {
       Navigator.of(context).pop(true);
     } on EmployeeVehicleMappingServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }

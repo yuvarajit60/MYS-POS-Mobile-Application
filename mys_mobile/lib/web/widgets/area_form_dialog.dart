@@ -4,6 +4,7 @@ import '../../models/city.dart';
 import '../../services/area_service.dart';
 import '../../services/city_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of the mobile Area add/edit form — Area Name + City.
 /// No delete confirmation lives inside this dialog (Area has no delete
@@ -49,7 +50,7 @@ class _AreaFormDialogState extends State<AreaFormDialog> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a city.')));
+      showWebMessage(context, 'Select a city.');
       return;
     }
 
@@ -66,7 +67,7 @@ class _AreaFormDialogState extends State<AreaFormDialog> {
       Navigator.of(context).pop(true);
     } on AreaServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

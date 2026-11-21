@@ -6,6 +6,7 @@ import '../../models/customer.dart';
 import '../../services/cancel_entry_service.dart';
 import '../../services/customer_service.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 const List<String> _cancelEntryTransactionTypes = ['Sales Order', 'Trip Entry', 'Delivery', 'Payment'];
 
@@ -111,7 +112,7 @@ class _CancelEntryWebScreenState extends State<CancelEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

@@ -14,6 +14,7 @@ import '../widgets/customer_form_dialog.dart';
 import '../widgets/product_form_dialog.dart';
 import '../widgets/site_form_dialog.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of create_sales_order_screen.dart (mobile) — same
 /// Customer/Site/Product picking logic and the same shared LineItemsGrid
@@ -223,7 +224,7 @@ class _SalesOrderEntryWebScreenState extends State<SalesOrderEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

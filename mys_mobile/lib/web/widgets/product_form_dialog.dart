@@ -9,6 +9,7 @@ import '../../services/product_group_service.dart';
 import '../../services/product_service.dart';
 import '../../services/product_type_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// See product_form_screen.dart (mobile) for the same fields/logic as a
 /// field-by-field push screen; this is the web equivalent as a modal
@@ -83,9 +84,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedGroup == null || _selectedBrand == null || _selectedType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a product group, brand, and type.')),
-      );
+      showWebMessage(context, 'Select a product group, brand, and type.');
       return;
     }
 
@@ -117,7 +116,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       Navigator.of(context).pop<Product>(product);
     } on ProductServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -147,7 +146,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       Navigator.of(context).pop(true);
     } on ProductServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }

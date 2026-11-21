@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/site.dart';
 import '../../services/site_service.dart';
 import '../widgets/customer_site_mapping_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Customer Site Mapping screen — mirrors
 /// manage_customer_site_mappings_screen.dart (mobile): lists sites with
@@ -89,7 +90,7 @@ class _CustomerSiteMappingWebScreenState extends State<CustomerSiteMappingWebScr
       _runSearch(_searchController.text);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

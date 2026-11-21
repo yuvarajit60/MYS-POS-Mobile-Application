@@ -5,6 +5,7 @@ import '../../models/customer.dart';
 import '../../models/payment_type.dart';
 import '../../services/payment_service.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Web equivalent of create_payment_screen.dart (mobile) — records a
 /// payment against a customer's delivered goods. Create-only, same as
@@ -93,7 +94,7 @@ class _PaymentEntryWebScreenState extends State<PaymentEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

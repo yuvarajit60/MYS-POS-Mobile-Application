@@ -14,6 +14,7 @@ import '../../services/site_service.dart';
 import '../../services/vehicle_service.dart';
 import '../widgets/site_form_dialog.dart';
 import '../widgets/web_search_picker.dart';
+import '../web_toast.dart';
 
 /// Vehicle numbers (e.g. "TN33BL8268") are always uppercase letters/digits,
 /// max 10 characters — enforced as the rep types, not just on save.
@@ -203,7 +204,7 @@ class _DeliveryEntryWebScreenState extends State<DeliveryEntryWebScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showWebMessage(context, message);
   }
 
   @override

@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/site.dart';
 import '../../services/site_service.dart';
 import '../widgets/site_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Site master screen — same search/table/dialog pattern as the
 /// other web masters. Customer mapping is deliberately not editable here,
@@ -69,7 +70,7 @@ class _SiteMasterWebScreenState extends State<SiteMasterWebScreen> {
       if (saved != null) _runSearch(_searchController.text);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 
@@ -95,7 +96,7 @@ class _SiteMasterWebScreenState extends State<SiteMasterWebScreen> {
       _runSearch(_searchController.text);
     } on SiteServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

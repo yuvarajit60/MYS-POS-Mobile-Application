@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../models/employee_vehicle_mapping.dart';
 import '../../services/employee_vehicle_mapping_service.dart';
 import '../widgets/vehicle_mapping_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Employee Vehicle Mapping screen — same search/table/dialog
 /// pattern as the other web masters. Same EmployeeVehicleMappingService/
@@ -90,7 +91,7 @@ class _VehicleMappingWebScreenState extends State<VehicleMappingWebScreen> {
       _runSearch(_searchController.text);
     } on EmployeeVehicleMappingServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

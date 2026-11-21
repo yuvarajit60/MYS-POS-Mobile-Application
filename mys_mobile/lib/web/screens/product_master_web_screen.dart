@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../widgets/product_form_dialog.dart';
+import '../web_toast.dart';
 
 /// Web-only Product master screen — same search/table/dialog pattern as
 /// HeadMasterWebScreen. Same ProductService/Product model as mobile.
@@ -68,7 +69,7 @@ class _ProductMasterWebScreenState extends State<ProductMasterWebScreen> {
       if (saved != null) _runSearch(_searchController.text);
     } on ProductServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 
@@ -94,7 +95,7 @@ class _ProductMasterWebScreenState extends State<ProductMasterWebScreen> {
       _runSearch(_searchController.text);
     } on ProductServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     }
   }
 

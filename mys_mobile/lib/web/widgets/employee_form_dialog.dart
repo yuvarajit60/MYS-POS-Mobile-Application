@@ -6,6 +6,7 @@ import '../../models/employee_detail.dart';
 import '../../services/city_service.dart';
 import '../../services/employee_service.dart';
 import 'web_search_picker.dart';
+import '../web_toast.dart';
 
 /// See employee_form_screen.dart (mobile) for the same fields/logic as a
 /// field-by-field push screen; this is the web equivalent as a modal
@@ -61,7 +62,7 @@ class _EmployeeFormDialogState extends State<EmployeeFormDialog> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a city.')));
+      showWebMessage(context, 'Select a city.');
       return;
     }
 
@@ -106,7 +107,7 @@ class _EmployeeFormDialogState extends State<EmployeeFormDialog> {
       Navigator.of(context).pop<Employee>(employee);
     } on EmployeeServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -136,7 +137,7 @@ class _EmployeeFormDialogState extends State<EmployeeFormDialog> {
       Navigator.of(context).pop(true);
     } on EmployeeServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      showWebMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
