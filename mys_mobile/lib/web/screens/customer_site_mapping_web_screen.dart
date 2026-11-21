@@ -147,7 +147,7 @@ class _CustomerSiteMappingWebScreenState extends State<CustomerSiteMappingWebScr
                             DataRow(
                               cells: [
                                 DataCell(Text(site.siteName)),
-                                DataCell(Text(site.customerId != null ? site.customerName! : 'Not mapped')),
+                                DataCell(Text(site.customerId != null ? (site.customerName ?? 'Unknown customer') : 'Not mapped')),
                                 DataCell(Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [

@@ -129,7 +129,7 @@ class _ManageCustomerSiteMappingsScreenState extends State<ManageCustomerSiteMap
                       final mapped = site.customerId != null;
                       return ListTile(
                         title: Text(site.siteName),
-                        subtitle: Text(mapped ? site.customerName! : 'Not mapped'),
+                        subtitle: Text(mapped ? (site.customerName ?? 'Unknown customer') : 'Not mapped'),
                         onTap: () => _edit(site),
                         trailing: mapped
                             ? IconButton(

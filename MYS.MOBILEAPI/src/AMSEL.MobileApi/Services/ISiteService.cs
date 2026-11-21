@@ -53,8 +53,13 @@ public class SiteService : ISiteService
                    SM.CUSTOMERID AS CustomerId, C.CUSTOMERNAME AS CustomerName, ISNULL(C.MOBILENO, '') AS MobileNo
             FROM SITE S
             LEFT JOIN AREA A ON A.AreaId = S.AREAID
+            -- No "AND C.STATUS = 1" here: this resolves whichever customer the
+            -- active mapping actually points at, even if that customer was
+            -- deactivated afterwards — filtering it out left CustomerId set but
+            -- CustomerName null, which crashed the client's "mapped ? name! :
+            -- 'Not mapped'" display.
             LEFT JOIN SITE_MAPPING SM ON SM.SITEID = S.SITEID AND SM.STATUS = 1
-            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = SM.CUSTOMERID AND C.STATUS = 1
+            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = SM.CUSTOMERID
             WHERE S.STATUS = 1
               AND (@CustomerId IS NULL OR SM.CUSTOMERID = @CustomerId)
               AND (@Search IS NULL OR S.SITENAME LIKE @Like)
@@ -78,7 +83,7 @@ public class SiteService : ISiteService
             LEFT JOIN AREA A ON A.AreaId = S.AREAID
             LEFT JOIN CITY CI ON CI.CITYID = A.CityId
             LEFT JOIN SITE_MAPPING SM ON SM.SITEID = S.SITEID AND SM.STATUS = 1
-            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = SM.CUSTOMERID AND C.STATUS = 1
+            LEFT JOIN CUSTOMER C ON C.CUSTOMERID = SM.CUSTOMERID
             WHERE S.SITEID = @SiteId AND S.STATUS = 1
             """,
             new { SiteId = siteId });
