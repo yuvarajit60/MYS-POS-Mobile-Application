@@ -40,6 +40,11 @@ public class InvalidSalesEntryException : Exception
 /// straight from TRIPENTRY_DETAILS (already a complete, self-contained
 /// line). Each source is marked ISSALES = 1 once converted, so it can't be
 /// selected again.
+///
+/// Each SALES_DETAILS line also gets a matching SALES_TAXDETAILS row (see
+/// db/035_sales_taxdetails.sql) — same per-product CGST/SGST/IGST split,
+/// just in its own table, mirroring what the desktop app's own
+/// sp_SalesOrderTosales already writes there for desktop-created entries.
 /// </summary>
 public class SalesEntryService : ISalesEntryService
 {
@@ -208,6 +213,22 @@ public class SalesEntryService : ISalesEntryService
                     """,
                     new { SalesId = salesId, source.EntryNo },
                     transaction);
+
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO SALES_TAXDETAILS
+                        (SALESID, PRODUCTID, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT)
+                    SELECT
+                        @SalesId, SOD.PRODUCTID,
+                        SOD.CGSTPERCENTAGE, (SOD.CGSTAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY,
+                        SOD.SGSTPERCENTAGE, (SOD.SGSTAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY,
+                        SOD.IGSTPERCENTAGE, (SOD.IGSTAMOUNT / NULLIF(SOD.SALESQTY, 0)) * DD.DELIVERYQTY
+                    FROM DELIVERY_DETAILS DD
+                    INNER JOIN SALESORDER_DETAILS SOD ON SOD.SALESORDERDETID = DD.SALESORDERDETID
+                    WHERE DD.DELIVERYNO = @EntryNo AND (DD.CANCEL IS NULL OR DD.CANCEL = 0) AND DD.ISSALES = 0
+                    """,
+                    new { SalesId = salesId, source.EntryNo },
+                    transaction);
             }
             else
             {
@@ -226,6 +247,22 @@ public class SalesEntryService : ISalesEntryService
                         TD.TAXABLEVALUE, TD.CGSTPERCENTAGE, TD.CGSTAMOUNT, TD.SGSTPERCENTAGE, TD.SGSTAMOUNT,
                         TD.IGSTPERCENTAGE, TD.IGSTAMOUNT, TD.TOTALTAX, TD.PERRATE, TD.PRATE, TD.TOTALAMOUNT,
                         TD.QTY, NULL, NULL, 0, 0, 0, 0, 0
+                    FROM TRIPENTRY_DETAILS TD
+                    INNER JOIN TRIPENTRY TE ON TE.TRIPENTRYID = TD.TRIPENTRYID
+                    WHERE TE.ENTRYNO = @EntryNo AND TE.LOCATIONID = @LocationId AND TE.CANCEL = 0 AND TE.ISSALES = 0
+                    """,
+                    new { SalesId = salesId, source.EntryNo, LocationId = locationId },
+                    transaction);
+
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO SALES_TAXDETAILS
+                        (SALESID, PRODUCTID, CGSTPERCENTAGE, CGSTAMOUNT, SGSTPERCENTAGE, SGSTAMOUNT, IGSTPERCENTAGE, IGSTAMOUNT)
+                    SELECT
+                        @SalesId, TD.PRODUCTID,
+                        TD.CGSTPERCENTAGE, TD.CGSTAMOUNT,
+                        TD.SGSTPERCENTAGE, TD.SGSTAMOUNT,
+                        TD.IGSTPERCENTAGE, TD.IGSTAMOUNT
                     FROM TRIPENTRY_DETAILS TD
                     INNER JOIN TRIPENTRY TE ON TE.TRIPENTRYID = TD.TRIPENTRYID
                     WHERE TE.ENTRYNO = @EntryNo AND TE.LOCATIONID = @LocationId AND TE.CANCEL = 0 AND TE.ISSALES = 0
